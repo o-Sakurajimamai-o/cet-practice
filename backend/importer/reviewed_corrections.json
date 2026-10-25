@@ -1,0 +1,236 @@
+{
+  "version": "2026-10-25",
+  "corrections": {
+    "2022-12-1:listening:23": {
+      "expected_answer": "C",
+      "source_file": "2022-12/第1套/解析PDF/听力解析.pdf",
+      "evidence_page": 29,
+      "explanation_page": 31,
+      "note": "本地独立复核修正了原解析的定位与信号，答案 C 不变。原定位句讲硬币被提前捞走，不能证明用途；正确依据为同篇录音原文中纽约公园喷泉维护费用的说明。",
+      "labels": {
+        "定位": "In New York City, for example, coins collected from fountains in public parks often go towards the fountains' maintenance itself, though entrepreneurs who don't mind getting their hands wet often get to it first.\n例如，在纽约市，从公园喷泉中收集的硬币通常用于喷泉本身的维护，尽管不介意弄湿双手的逐利者常常先一步取走它们。",
+        "信号": "先用 In New York City 锁定题目所问地点，再抓主句 go towards the fountains' maintenance itself，明确硬币用于喷泉维护。though 引导的让步从句补充有人提前捞走硬币，不改变主句所说明的资金用途。"
+      }
+    },
+    "2017-12-2:reading1:46": {
+      "source_answer": "D",
+      "expected_answer": "A",
+      "source_file": "2017-12/第2套/解析PDF/阅读理解（四选一）第1篇解析.pdf",
+      "evidence_location": "本地原文第1页、原解析第3页；杭州新东方2017-12-25同题解析",
+      "answer_source": "杭州新东方2017-12-25同题参考答案；原文：本地阅读理解第1篇解析.pdf第1页；本地第3页D经复核修正为A",
+      "note": "原PDF第3页误判D；据原文与杭州新东方同题参考答案复核改为A。仅修答案及A/D正误说明，其余正确标签和B/C说明保留。",
+      "labels": {
+        "答案": "A （细节题）",
+        "选项": "A)\n✓ 正确\nWhether robots can reach better decisions.\n电影中机器人按生存概率救人的例子，引出人与机器人会如何选择、何种决定是人类希望机器人作出的这一决策问题；A概括了对机器人决策的比较和评价，并非断言机器人一定作出更好决定。\nB)\n张冠李戴\nWhether robots follow Asimov's zeroth law. 把第三段才出现的 zeroth law 硬塞到第\n一段问句里，定位错段。\nC)\n无中生有\nHow robots may make bad judgments. 暗含\"机器人做了坏判断\"的负面定性，但原文\n只是中性描述\"按概率救人\"，并未称之为 bad judgments。\nD)\n答非所问\nHow robots should be programmed.\n题目问第一段事例直接引出的决策问题。D把如何选择扩为如何编程，不能用后续编程方法的话题替代首段对决策的比较和评价。"
+      },
+      "evidence_urls": [
+        {
+          "url": "https://cet4-6.xdf.cn/201712/10745821.html",
+          "title": "2017年12月六级第二套仔细阅读解析（杭州新东方）",
+          "published": "2017-12-25",
+          "checked": "完整读取第46至50题答案与解析；第46题为A，第47题D，第48题B，第49题A，第50题C。"
+        },
+        {
+          "url": "https://www.guojiya.cn/exam/cet6_2017_12_2/answers",
+          "title": "2017年12月英语六级真题答案（第2套）",
+          "checked": "读取同一题干及四选项对应的正确答案，第46题为A；通过题干内容匹配。"
+        },
+        {
+          "url": "https://m.hujiang.com/en/p1227568/",
+          "title": "2017年12月六级答案更新版",
+          "published": "2017-12-22",
+          "checked": "机器人篇第46题给出A；仅用于本题交叉核验。该页第48题与原文冲突，未采用其第48题答案。"
+        },
+        {
+          "url": "https://www.sohu.com/a/211010000_461659",
+          "title": "巨微英语：2017年12月六级第二套答案",
+          "published": "2017-12-17",
+          "checked": "文中同题题干与选项一致，答案区第46题A。该页第50题另有冲突，未整套照搬。"
+        }
+      ]
+    },
+    "2019-12-2:listening:23": {
+      "expected_answer": "B",
+      "source_file": "2019-12/第2套/解析PDF/听力解析.pdf",
+      "evidence_location": "本地第31页；同期新东方答案文本及过级鸭同题题干",
+      "note": "本地题干重复了第22题；按同题参考资料恢复为何需要新机场的题干，答案B与其余解释保留。",
+      "labels": {
+        "题目": "Why was there a need for a new airport in Berlin?"
+      },
+      "evidence_urls": [
+        "https://www.guojiya.cn/exam/cet6_2019_12_2/answers",
+        "https://cs.xdf.cn/dx/ljyyksdt/201912/138563853_2.html"
+      ],
+      "replacements": [
+        {
+          "old": "说话者对柏林梦想机场有何评价?",
+          "new": "为什么柏林需要一座新机场？"
+        }
+      ]
+    },
+    "2023-12-1:listening:19": {
+      "expected_answer": "A",
+      "source_file": "2023-12/第1套/解析PDF/听力解析.pdf",
+      "evidence_location": "本地第25页；沪江有道考神版及说客英语同题",
+      "note": "题干主语view为单数，win应为wins；仅修正这一拼写/主谓一致错误，答案A及其余正确解释保留。",
+      "replacements": [
+        {
+          "old": "What view of many dog owners win support from researchers studying dog cognition?",
+          "new": "What view of many dog owners wins support from researchers studying dog cognition?"
+        }
+      ],
+      "evidence_urls": [
+        "https://m.hujiang.com/en_Englishwriting/p1420747/",
+        "https://www.qdsk.talk915.com/article-details/61"
+      ]
+    },
+    "2017-12-1:listening:3": {
+      "expected_answer": "D",
+      "source_file": "2017-12/第1套/PDF/听力真题.pdf",
+      "evidence_location": "本地听力解析第2页；2017年12月新东方/沪江/233网校同期原卷",
+      "note": "源卷印刷重复修正：本地PDF中A、B两项重复印为 it has warned its people against possible food shortages.；经核对同期原卷恢复B项为 It has penalized businesses that keep overproducing foods. 并规范各选项首字母大写，判分答案 D 不变。",
+      "source_options": [
+        {
+          "key": "A",
+          "text": "it has warned its people against possible food shortages."
+        },
+        {
+          "key": "B",
+          "text": "it has warned its people against possible food shortages."
+        },
+        {
+          "key": "C",
+          "text": "it has started a nationwide campaign against food waste."
+        },
+        {
+          "key": "D",
+          "text": "it has banned supermarkets from dumping edible foods."
+        }
+      ],
+      "options": [
+        {
+          "key": "A",
+          "text": "It has warned its people against possible food shortages."
+        },
+        {
+          "key": "B",
+          "text": "It has penalized businesses that keep overproducing foods."
+        },
+        {
+          "key": "C",
+          "text": "It has started a nationwide campaign against food waste."
+        },
+        {
+          "key": "D",
+          "text": "It has banned supermarkets from dumping edible foods."
+        }
+      ],
+      "replacements": [
+        {
+          "old": "B) 它警告其民众可能出现食物短缺。",
+          "new": "B) 它处罚了持续过度生产食物的企业。"
+        },
+        {
+          "old": "本项文字与 A 完全相同（warned its people against possible food shortages），同样\n在录音里无对应，属未提及，自然不是答案。",
+          "new": "选项说政府处罚持续过度生产食物的企业，录音中法国政府处罚的是不遵守禁止丢弃可食用食物规定的商家（fail to comply with the regulations），而非处罚“过度生产（overproducing）”，属张冠李戴。"
+        }
+      ]
+    },
+    "2019-06-1:listening:15": {
+      "expected_answer": "A",
+      "source_file": "2019-06/第1套/PDF/听力真题.pdf",
+      "evidence_location": "本地听力解析第19页；2019年6月第1套纸质原卷第2页",
+      "note": "源卷印刷重复修正：本地PDF中C、D两项重复印为 They are too complex to understand.；经核对2019年6月第1套原卷恢复D项为 They reinforce each other constantly.，判分答案 A 不变。",
+      "source_options": [
+        {
+          "key": "A",
+          "text": "They are closely connected."
+        },
+        {
+          "key": "B",
+          "text": "They function in a similar way."
+        },
+        {
+          "key": "C",
+          "text": "They are too complex to understand."
+        },
+        {
+          "key": "D",
+          "text": "They are too complex to understand."
+        }
+      ],
+      "options": [
+        {
+          "key": "A",
+          "text": "They are closely connected."
+        },
+        {
+          "key": "B",
+          "text": "They function in a similar way."
+        },
+        {
+          "key": "C",
+          "text": "They are too complex to understand."
+        },
+        {
+          "key": "D",
+          "text": "They reinforce each other constantly."
+        }
+      ],
+      "replacements": [
+        {
+          "old": "D) 它们过于复杂而难以理解。",
+          "new": "D) 它们不断地相互强化。"
+        },
+        {
+          "old": "They are too complex to understand. 与 C 内容完全相同，同样把两者说成\"复杂难懂\"，\n与录音\"相连且可处理\"的结论不符，理由同 C。",
+          "new": "They reinforce each other constantly. 说两者\"不断相互强化\"，录音仅阐明身心紧密相连（connection）、身体健康反映心理健康，并未提及双向\"不断相互强化\"，属过度引申。"
+        }
+      ]
+    },
+    "2026-06-3:reading1:50": {
+      "source_answer": "D",
+      "expected_answer": "B",
+      "source_file": "2026-06/第3套/解析PDF/阅读理解（四选一）第1篇解析.pdf",
+      "evidence_location": "本地原文第2页末段；新东方2026-06-13/06-17当期解析、过级鸭及纸质详解第52页",
+      "answer_source": "新东方2026-06当期参考答案与纸质详解第52页；本地第8页D经复核修正为B",
+      "note": "原PDF误判D；据原文末段及新东方当期解析、纸质真题详解复核改为B。末段强调合理使用条款因个案而异、难以笼统断言数据集内所有作品均适用（支持B：可能不适用于当前法律案件），而非该法律条款本身存在不同解释（排除D）。",
+      "labels": {
+        "答案": "B （推断题）",
+        "定位": "However, since fair use applies differently to each case, it's hard to make a blanket statement about all works in a dataset as being applicable.\n然而，由于合理使用在不同案件中的适用方式各不相同，因此很难笼统地断言数据集中的所有作品都适用这一原则。",
+        "选项": "A)\n无中生有\nIt may determine the final verdict of the case.中的'final verdict'在原文无对应，作者仅指出“合理使用”条款的适用情况因个案而异，未讨论其对本案最终裁决的决定作用。\nB)\n✓ 正确\nsince fair use applies differently to each case, it's hard to make a blanket statement about all works in a dataset as being applicable ↔ It may not apply to the present legal case.\n末段最后一句指出，由于合理使用的适用情况因个案而异，很难对数据集中的所有作品一概而论断言其均适用该原则。由此可合理推断，该条款可能不适用于当前的法律诉讼案件（It may not apply to the present legal case）。\nC)\n偷换概念\nIt does not cover the works of all artists.把原文“很难对数据集中的所有作品一概而论（hard to make a blanket statement about all works in a dataset）”偷换并绝对化为“不涵盖所有艺术家的作品”，偏离原文表述。\nD)\n侧重偏离\nIt is subject to different interpretations.末段作者强调的是“合理使用”在不同个案中的适用性差异（applies differently to each case），而非该法律条款本身存在“不同的解释（different interpretations）”，两者侧重点不同，故排除。"
+      },
+      "evidence_urls": [
+        "https://cet4-6.xdf.cn/202606/15232924.html",
+        "https://www.xdf.cn/254/202606/15237575.html",
+        "https://www.guojiya.cn/exam/cet6_2026_06_3/answers"
+      ]
+    },
+    "2023-12-2:reading1:48": {
+      "expected_answer": "A",
+      "source_file": "2023-12/第2套/解析PDF/阅读理解（四选一）第1篇解析.pdf",
+      "evidence_location": "本地原文第1页第6段、原解析第5页",
+      "note": "复核保留答案 A。部分外部来源给 D（Most families in the UK do not have stable broadband connections），但原文第6段明确为 leaving poorer families without broadband connections（较贫困家庭缺少宽带），D 项将 poorer families 偷换夸大为 Most families in the UK（英国大多数家庭），属典型数量词失真；原文由数字排斥威胁社会公平引出对企业鼓吹元宇宙的恼火，支持 A 项推断。"
+    }
+  },
+  "material_corrections": {
+    "2017-12-1": {
+      "listening_group_ranges": [
+        {
+          "group_key": "g6",
+          "source_range": [
+            19,
+            21
+          ],
+          "verified_range": [
+            19,
+            22
+          ],
+          "uid": "2017-12-1:listening:22",
+          "note": "源标题纠错：本地听力印Questions 19 to 21，但第22题仍属同篇宽扎节，后篇才23–25；按卷面题序及宽扎节录音内容修正该篇范围为19–22，答案与正确解析不变。",
+          "evidence": "本地听力真题第4页：第22题在下一篇23–25标题之前；同套听力解析的宽扎节原文中逐日吟诵原则对应第22题A。"
+        }
+      ]
+    }
+  }
+}

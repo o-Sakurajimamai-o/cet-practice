@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#476b57" />
+    <script>
+      try {
+        var savedTheme = localStorage.getItem('cet6-theme');
+        var initialTheme = savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = initialTheme;
+        document.documentElement.style.colorScheme = initialTheme;
+      } catch (_) { document.documentElement.dataset.theme = 'light'; }
+    </script>
+    <meta name="description" content="六级研习室：本地离线的历年真题练习空间，保存每一份进步。" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>六级研习室</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
