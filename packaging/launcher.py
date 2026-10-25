@@ -96,7 +96,8 @@ def main():
         sock.listen(128)
         port = sock.getsockname()[1]
         server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=port,
-            loop='asyncio', http='h11', ws='none', lifespan='on', access_log=False))
+            loop='asyncio', http='h11', ws='none', lifespan='on', access_log=False,
+            timeout_graceful_shutdown=10))
         app.state.instance_id = instance_id
         app.state.local_server = server
         record = {'pid': os.getpid(), 'port': port, 'instance_id': instance_id, 'token': token}
