@@ -49,3 +49,5 @@ backend/venv/Scripts/python.exe packaging/launcher.py
 PDF 导入器仅供维护题库使用，额外依赖在 `backend/requirements.txt`。其资源根目录通过 `CET6_RESOURCE_ROOT` 指定；不要把重新导入当作验证答案正确性的依据。
 
 第三方许可见 `THIRD_PARTY_NOTICES.md` 与 `third_party_licenses/`。源码、第三方依赖和考试材料各自的权利范围分别适用，公开仓库不为所有材料额外授予统一许可证。
+
+本人所属 LINUX DO 社区，感谢 L 站佬友：https://linux.do/
