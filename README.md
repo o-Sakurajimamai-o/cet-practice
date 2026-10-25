@@ -1,6 +1,7 @@
 # 六级研习室 · CET6 Practice
 
 Windows 本地六级练习工具。下载便携版后，无需安装 Python 或 Node.js；题目、答案、解析、音频和练习记录均在本机使用。
+感谢 Linux Do 社区：https://linux.do/
 
 ## 普通用户下载
 
@@ -50,4 +51,3 @@ PDF 导入器仅供维护题库使用，额外依赖在 `backend/requirements.tx
 
 第三方许可见 `THIRD_PARTY_NOTICES.md` 与 `third_party_licenses/`。源码、第三方依赖和考试材料各自的权利范围分别适用，公开仓库不为所有材料额外授予统一许可证。
 
-本人所属 LINUX DO 社区，感谢 L 站佬友：https://linux.do/
