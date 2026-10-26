@@ -1,0 +1,30 @@
+{
+  "description": "CET4 source-validated review annotations; no objective answer changed",
+  "corrections": {
+    "cet4-2025-12-1:reading1:50": {
+      "source_answer": "C",
+      "expected_answer": "C",
+      "kind": "review_annotation",
+      "note": "多源分歧复核：保留C。末段明确指出仍需更多研究来确定不同疾病的最佳给药时间，直接支持C；部分新东方考后页选择A，A与前文处方建议相关，但针对末段建议不如C直接。保留此分歧供对照原卷，不声称官方唯一答案。",
+      "evidence_location": "阅读理解（四选一）第1篇解析.pdf 第6页；新东方2025年12月考后汇总页",
+      "evidence": [
+        "https://cet4-6.xdf.cn/202512/15047649.html",
+        "https://cet4.koolearn.com/20251213/930093.html"
+      ],
+      "disputed": true
+    },
+    "cet4-2020-12-2:matching:44": {
+      "source_answer": "C",
+      "expected_answer": "C",
+      "kind": "review_annotation",
+      "note": "多源分歧复核：保留C。下载材料及新东方大连、广州教师的逐题讲解均定位C段；过级鸭给E，C/E在语义上有部分重合。依据C段首句及署名原文定位保留C，记录外部E版本供复核。",
+      "evidence_location": "长篇阅读（信息匹配）解析.pdf 第9页；新东方大连/广州署名讲解及过级鸭对照",
+      "evidence": [
+        "https://cet4-6.xdf.cn/202012/11134944.html",
+        "https://file.xdf.cn/uploads/201212/145_201212130505f6Rsebjzja2IzF6K.pdf",
+        "https://www.guojiya.cn/exam/cet4_2020_12_2/answers"
+      ],
+      "disputed": true
+    }
+  }
+}

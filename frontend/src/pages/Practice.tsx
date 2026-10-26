@@ -7,6 +7,8 @@ import {
 import AudioPlayer from '../components/AudioPlayer'
 import MaterialPanel from '../components/MaterialPanel'
 import QuestionCard from '../components/QuestionCard'
+import Icon from '../components/Icon'
+import ThemeToggle from '../components/ThemeToggle'
 import { SessionSaver, type SessionProgress } from '../sessionSaver'
 
 const SECTION_ORDER = ['listening', 'cloze', 'matching', 'reading1', 'reading2', 'writing', 'translation']
@@ -320,6 +322,11 @@ export default function Practice() {
     return m
   }, [data])
 
+  // Keep the active section tab visible when the tab strip scrolls horizontally on small screens.
+  useEffect(() => {
+    toolbarRef.current?.querySelector('.section-tabs .active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [activeSection, !!data])
+
   useLayoutEffect(() => {
     const toolbar = toolbarRef.current, page = pageRef.current
     if (!toolbar || !page) return
@@ -330,8 +337,8 @@ export default function Practice() {
     return () => observer.disconnect()
   }, [!!data])
 
-  if (err) return <div className="card">出错了：{err} <button onClick={() => nav('/')}>返回</button></div>
-  if (!data) return <div className="loading">加载试卷…</div>
+  if (err) return <div className="empty-state card"><Icon name="alert" size={32}/><h3>练习加载失败</h3><p>{err}</p><button onClick={() => nav('/')}>返回试卷库</button></div>
+  if (!data) return <div className="loading" role="status"><span className="spinner"/>正在加载试卷…</div>
 
   const { questions, paper } = data
   const result = data.session.result
@@ -355,71 +362,93 @@ export default function Practice() {
   // 客观题进度（不含作文/翻译）
   const objQs = questions.filter((q: any) => q.qtype !== 'essay' && q.qtype !== 'translation')
   const objAnswered = objQs.filter((q: any) => answers[q.uid]).length
+  const busyNow = submitting || restarting
+  const fullMode = data.session.mode === 'full'
 
   return (
     <div className="practice-page" ref={pageRef}>
       <div className="practice-toolbar" ref={toolbarRef}>
-      <div className="practice-head">
-        <button disabled={submitting || restarting} onClick={async () => { try { refreshClock(); await persist(true); nav('/') } catch { /* Keep unsaved answers visible. */ } }}>← 试卷库</button>
-        <span className="title">{data.session.mode === 'full' ? `${paper.paper_key}（第 ${paper.set_no} 套）` : `${materialPaper} · 当前材料`}</span>
-        <span className="muted small">{data.session.mode === 'full' ? '整卷练习' : '重做练习'}</span>
-        <span className="timer">⏱ {fmtElapsed(elapsed)}</span>
-        <span className="muted small">客观题 {objAnswered}/{objQs.length}</span>
-        {savedTip && <span className="saved-tip small">{savedTip}</span>}
-        <div className="font-ctl" style={{ marginLeft: 'auto' }}>
-          <span className="muted small">字号</span>
-          <button onClick={() => changeFont(-0.05)}>A-</button>
-          <button onClick={() => changeFont(0.05)}>A+</button>
+        <div className="practice-head">
+          <button className="icon-btn back-btn" aria-label="返回试卷库" title="返回试卷库" disabled={busyNow} onClick={async () => { try { refreshClock(); await persist(true); nav('/') } catch { /* Keep unsaved answers visible. */ } }}><Icon name="back" size={19}/></button>
+          <div className="practice-title">
+            <b className="title">{fullMode ? `${paper.year} 年 ${paper.month} 月 · 第 ${paper.set_no} 套` : `${materialPaper} · 当前材料`}</b>
+            <span>{String(materialPaper).startsWith('cet4-') ? '英语四级' : '英语六级'} · {fullMode ? '整卷练习' : '错题重做'} · 客观题已答 {objAnswered}/{objQs.length}{savedTip && <em className="saved-tip"><Icon name="check" size={13}/>{savedTip}</em>}</span>
+          </div>
+          <span className="timer" title="已用时间"><Icon name="clock" size={16}/>{fmtElapsed(elapsed)}</span>
+          <div className="practice-actions">
+            <div className="font-ctl" role="group" aria-label="正文字号">
+              <button onClick={() => changeFont(-0.05)} aria-label="缩小字号" title="缩小字号">A<sup>−</sup></button>
+              <span aria-hidden="true">{Math.round(fontScale * 100)}%</span>
+              <button onClick={() => changeFont(0.05)} aria-label="放大字号" title="放大字号">A<sup>+</sup></button>
+            </div>
+            <ThemeToggle compact/>
+            <button className="practice-restart ghost" disabled={busyNow || saveConflict} onClick={startAgain} title="开启空白练习，之前的作答仍保留"><Icon name="restart" size={16}/><span>{restarting ? '正在重新开始…' : '重新开始'}</span></button>
+            {!submitted ? (
+              <button className="primary submit-btn" disabled={busyNow || saveConflict} onClick={() => setConfirming(true)}><Icon name="flag" size={16}/>{submitting ? '正在交卷…' : '交卷'}</button>
+            ) : (
+              <span className="tag ok submitted-tag"><Icon name="check" size={14}/>已交卷 {data.session.submitted_at}</span>
+            )}
+          </div>
         </div>
-        <button className="practice-restart" disabled={submitting || restarting || saveConflict} onClick={startAgain} title="开启空白练习，之前的作答仍保留">{restarting ? '正在重新开始…' : '重新开始'}</button>
-        {!submitted ? (
-          <button className="primary" disabled={submitting || restarting || saveConflict} onClick={() => setConfirming(true)}>{submitting ? '正在交卷…' : '交卷'}</button>
-        ) : (
-          <span className="tag ok">已交卷 {data.session.submitted_at}</span>
+
+        <div className="section-tabs" role="tablist" aria-label="题型">
+          {SECTION_ORDER.filter((s) => bySection[s]?.length).map((s) => {
+            const done = bySection[s].filter((q: any) => answers[q.uid]).length
+            const total = bySection[s].length
+            return (
+              <button
+                key={s}
+                role="tab"
+                aria-selected={activeSection === s}
+                className={`${activeSection === s ? 'active' : ''}${done === total ? ' complete' : ''}`}
+                disabled={busyNow}
+                onClick={() => { focusQuestion(bySection[s].find(q => q.uid === sectionPositions.current[s]) || bySection[s][0]); window.scrollTo({ top: 0, behavior: 'instant' }) }}
+              >
+                <span>{SECTION_CN[s]}</span><small>{done}/{total}</small>
+              </button>
+            )
+          })}
+        </div>
+
+        {activeSection === 'listening' && (
+          <AudioPlayer
+            key={materialPaper}
+            src={audio_url}
+            hasAudio={!!audio_url}
+            startPos={audioPositions.current[materialPaper] || 0}
+            paused={busyNow}
+            onPos={(p, updateUi = true) => {
+              audioPositions.current[materialPaper] = p
+              saver.update({ audio_pos: p, audio_paper_key: materialPaper }, !submittedRef.current)
+              if (updateUi) updateProgress({})
+            }}
+          />
         )}
+        <div className="toolbar-progress" aria-hidden="true"><span style={{ width: `${objQs.length ? (objAnswered / objQs.length) * 100 : 0}%` }}/></div>
       </div>
 
-      <div className="section-tabs">
-        {SECTION_ORDER.filter((s) => bySection[s]?.length).map((s) => (
-          <button
-            key={s}
-            className={activeSection === s ? 'active' : ''}
-            disabled={submitting || restarting}
-            onClick={() => { focusQuestion(bySection[s].find(q => q.uid === sectionPositions.current[s]) || bySection[s][0]); window.scrollTo({ top: 0, behavior: 'instant' }) }}
-          >
-            {SECTION_CN[s]}（{bySection[s].length}）
-          </button>
-        ))}
-      </div>
-
-      {activeSection === 'listening' && (
-        <AudioPlayer
-          key={materialPaper}
-          src={audio_url}
-          hasAudio={!!audio_url}
-          startPos={audioPositions.current[materialPaper] || 0}
-          paused={submitting || restarting}
-          onPos={(p, updateUi = true) => {
-            audioPositions.current[materialPaper] = p
-            saver.update({ audio_pos: p, audio_paper_key: materialPaper }, !submittedRef.current)
-            if (updateUi) updateProgress({})
-          }}
-        />
-      )}
-
-      </div>
-
-      {saveError && <div className="notice error" role="alert">{saveError}{saveConflict
+      {saveError && <div className="notice error" role="alert"><span><Icon name="alert" size={16}/>{saveError}</span>{saveConflict
         ? <button onClick={downloadLocalAnswers}>下载本页作答</button>
-        : <button disabled={submitting || restarting} onClick={() => persist().catch(() => {})}>重试保存</button>}</div>}
-      {actionError && <div className="notice error" role="alert">{actionError}<button onClick={() => setActionError('')} aria-label="关闭操作提示">关闭</button></div>}
+        : <button disabled={busyNow} onClick={() => persist().catch(() => {})}>重试保存</button>}</div>}
+      {actionError && <div className="notice error" role="alert"><span><Icon name="alert" size={16}/>{actionError}</span><button onClick={() => setActionError('')} aria-label="关闭操作提示">关闭</button></div>}
 
       {confirming && (
-        <div className="card" style={{ borderColor: 'var(--red)' }}>
-          <b>确认交卷？</b>
-          <p className="muted">未作答的客观题将计为未作答；缺少标准答案的题不判分；作文与翻译不参与统计（未填写草稿也可交卷）。</p>
-          <button className="primary" disabled={submitting || restarting || saveConflict} onClick={doSubmit}>{submitting ? '保存并交卷中…' : '确认交卷'}</button>
-          <button disabled={submitting || restarting} onClick={() => setConfirming(false)}>继续做题</button>
+        <div className="modal-backdrop" onClick={() => { if (!submitting) setConfirming(false) }}>
+          <div className="modal-dialog confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title" onClick={e => e.stopPropagation()}
+            onKeyDown={e => { if (e.key === 'Escape' && !submitting) setConfirming(false) }}>
+            <span className="confirm-icon"><Icon name="flag" size={24}/></span>
+            <h3 id="confirm-title">确认交卷？</h3>
+            <div className="confirm-progress">
+              <div><b>{objAnswered}</b><span>已作答</span></div>
+              <div><b>{objQs.length - objAnswered}</b><span>未作答</span></div>
+              <div><b>{fmtElapsed(elapsed)}</b><span>用时</span></div>
+            </div>
+            <p className="muted">未作答的客观题将计为未作答；缺少标准答案的题不判分；作文与翻译不参与统计（未填写草稿也可交卷）。</p>
+            <div className="confirm-actions">
+              <button disabled={busyNow} onClick={() => setConfirming(false)} autoFocus>继续做题</button>
+              <button className="primary" disabled={busyNow || saveConflict} onClick={doSubmit}>{submitting ? '保存并交卷中…' : '确认交卷'}</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -431,7 +460,7 @@ export default function Practice() {
             section={activeSection}
             mat={mat}
             selectedBlank={selectedBlank}
-            disabled={submitting || restarting}
+            disabled={busyNow}
             availableBlanks={visibleQuestions.filter((q: any) => q.qtype === 'blank').map((q: any) => q.q_no)}
             onBlankClick={(no) => {
               const q = (bySection.cloze || []).find((x: any) => x.q_no === no && (!x.paper_key || x.paper_key === materialPaper))
@@ -443,32 +472,37 @@ export default function Practice() {
         </div>
         <div className="questions-col">
           {sectionPapers.length > 1 && <div className="redo-paper-switch">
-            <label>当前试卷 <select aria-label="切换重做试卷" value={materialPaper} disabled={submitting || restarting}
+            <label>当前试卷 <select aria-label="切换重做试卷" value={materialPaper} disabled={busyNow}
               onChange={e => focusQuestion(secQuestions.find((q: any) => q.paper_key === e.target.value))}>
               {sectionPapers.map(key => <option key={key} value={key}>{key}（{secQuestions.filter((q: any) => q.paper_key === key).length} 题）</option>)}
             </select></label>
             <span className="muted small">题目与左侧材料按试卷一起切换。</span>
           </div>}
-          <div className="qnav">
-            {visibleQuestions.map((q: any) => {
-              const ans = answers[q.uid]
-              let cls = 'qn'
-              if (ans) cls += ' answered'
-              if (q.uid === currentUid) cls += ' current'
-              if (favSet.has(q.uid)) cls += ' fav'
-              if (submitted && result?.detail?.[q.uid]) {
-                const v = result.detail[q.uid].verdict
-                if (v === 'correct') cls += ' correct'
-                else if (v === 'wrong') cls += ' wrong'
-                else if (v === 'no_key') cls += ' nokey'
-              }
-              return (
-                <button key={q.uid} className={cls} aria-label={`第 ${q.q_no} 题`} aria-current={q.uid === currentUid ? 'true' : undefined}
-                  disabled={submitting || restarting}
-                  onClick={() => focusQuestion(q, true)}
-                >{q.q_no}</button>
-              )
-            })}
+          <div className="qnav-card">
+            <div className="qnav-head"><span>题号导航</span><span className="qnav-legend">
+              {submitted ? <><i className="lg correct"/>正确<i className="lg wrong"/>错误</> : <><i className="lg answered"/>已答<i className="lg"/>未答</>}<i className="lg fav"/>收藏
+            </span></div>
+            <div className="qnav">
+              {visibleQuestions.map((q: any) => {
+                const ans = answers[q.uid]
+                let cls = 'qn'
+                if (ans) cls += ' answered'
+                if (q.uid === currentUid) cls += ' current'
+                if (favSet.has(q.uid)) cls += ' fav'
+                if (submitted && result?.detail?.[q.uid]) {
+                  const v = result.detail[q.uid].verdict
+                  if (v === 'correct') cls += ' correct'
+                  else if (v === 'wrong') cls += ' wrong'
+                  else if (v === 'no_key') cls += ' nokey'
+                }
+                return (
+                  <button key={q.uid} className={cls} aria-label={`第 ${q.q_no} 题`} aria-current={q.uid === currentUid ? 'true' : undefined}
+                    disabled={busyNow}
+                    onClick={() => focusQuestion(q, true)}
+                  >{q.q_no}</button>
+                )
+              })}
+            </div>
           </div>
 
           {visibleQuestions.map((q: any) => {
@@ -486,7 +520,7 @@ export default function Practice() {
                 answer={answers[q.uid]}
                 onAnswer={(v) => setAnswer(q.uid, v)}
                 submitted={submitted}
-                saving={submitting || restarting || saveConflict}
+                saving={busyNow || saveConflict}
                 detail={result?.detail?.[q.uid]}
                 isCurrent={q.uid === currentUid}
                 favorite={favSet.has(q.uid)}
@@ -509,27 +543,41 @@ export default function Practice() {
 
 function ResultHero({ result }: { result: any }) {
   const graded = (result.correct || 0) + (result.wrong || 0)
+  const pct = result.accuracy != null ? result.accuracy * 100 : null
+  const R = 52, C = 2 * Math.PI * R
   return (
-    <div className="card result-hero">
-      <div className="big-num">
-        {result.accuracy != null ? `${(result.accuracy * 100).toFixed(1)}%` : '—'}
+    <section className="card result-hero" aria-label="交卷结果">
+      <div className="result-ring">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r={R} className="ring-track"/>
+          <circle cx="60" cy="60" r={R} className="ring-value" strokeDasharray={`${((pct ?? 0) / 100) * C} ${C}`}/>
+        </svg>
+        <div className="ring-label"><b>{pct != null ? `${pct.toFixed(1)}%` : '—'}</b><span>正确率</span></div>
       </div>
-      <div className="muted">客观题正确率（正确 {result.correct} / 已作答且有答案 {graded}）</div>
-      <div className="stats-grid">
-        <div className="stat"><b>{result.correct}</b>正确</div>
-        <div className="stat"><b>{result.wrong}</b>错误</div>
-        <div className="stat"><b>{result.unanswered}</b>未作答</div>
-        <div className="stat"><b>{result.no_key}</b>无答案不判分</div>
+      <div className="result-body">
+        <h2>练习完成</h2>
+        <p className="muted">客观题正确率 = 正确 {result.correct} / 已作答且有答案 {graded}（不是四六级考试分数）</p>
+        <div className="result-stats">
+          <div className="rs correct"><b>{result.correct}</b><span>正确</span></div>
+          <div className="rs wrong"><b>{result.wrong}</b><span>错误</span></div>
+          <div className="rs"><b>{result.unanswered}</b><span>未作答</span></div>
+          <div className="rs"><b>{result.no_key}</b><span>无答案不判分</span></div>
+        </div>
+        {result.note && <p className="muted small">{result.note}</p>}
       </div>
-      <div className="muted small" style={{ marginTop: 10 }}>{result.note}</div>
-      <div style={{ marginTop: 10 }}>
-        {Object.entries(result.per_section || {}).map(([k, v]: any) => (
-          <span key={k} className="tag" style={{ margin: 3 }}>
-            {k}：对{v.correct} 错{v.wrong} 未答{v.unanswered}{v.no_key ? ` 无答案${v.no_key}` : ''}
-          </span>
-        ))}
+      <div className="result-sections">
+        {Object.entries(result.per_section || {}).map(([k, v]: any) => {
+          const total = (v.correct || 0) + (v.wrong || 0) + (v.unanswered || 0) + (v.no_key || 0)
+          const w = (n: number) => `${total ? (n / total) * 100 : 0}%`
+          return (
+            <div key={k} className="rsec">
+              <div className="rsec-head"><span>{SECTION_CN[k] || k}</span><span>对 {v.correct} · 错 {v.wrong} · 未答 {v.unanswered}{v.no_key ? ` · 无答案 ${v.no_key}` : ''}</span></div>
+              <div className="rsec-bar"><i className="c" style={{ width: w(v.correct || 0) }}/><i className="w" style={{ width: w(v.wrong || 0) }}/></div>
+            </div>
+          )
+        })}
       </div>
-    </div>
+    </section>
   )
 }
 

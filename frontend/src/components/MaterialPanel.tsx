@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
 import { SubjectivePrompt } from './PdfProse'
+import Icon from './Icon'
 
 /** 左侧材料面板：按题型渲染共享材料（文章/词库/段落/写作翻译题面）。 */
 export default function MaterialPanel({
@@ -15,30 +16,32 @@ export default function MaterialPanel({
   disabled?: boolean
   availableBlanks?: number[]
 }) {
-  if (!mat) return <div className="card muted">该题型无共享材料。</div>
+  if (!mat) return <div className="card material-card muted">该题型无共享材料。</div>
   const c = mat.content || {}
 
   if (section === 'listening') {
     const groups = c.groups || []
     return (
-      <div className="card">
-        <div className="muted small">听力各篇目对应题号（录音文字稿在交卷后解析中提供）：</div>
-        {groups.map((g: any, i: number) => (
-          <div key={i} style={{ margin: '6px 0' }}>
-            <span className="tag info">篇目 {i + 1}</span>
-            <b> 第 {g.from}–{g.to} 题</b>
-            {showTranscript && g.lines?.length > 0 && (
-              <div className="analysis" style={{ maxHeight: 260 }}>
-                {g.lines.map((l: any, j: number) => (
-                  <div key={j} style={{ marginBottom: 4 }}>
-                    <b>{l.speaker ? l.speaker + ': ' : ''}{l.en}</b>
-                    {l.cn && <div className="muted">{l.cn}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+      <div className="card material-card">
+        <div className="material-head"><Icon name="headphones" size={16}/>听力篇目</div>
+        <p className="hint">{showTranscript ? '交卷后可查看每篇录音原文与中文翻译。' : '录音原文与翻译在交卷后提供。'}</p>
+        <div className="listen-groups">
+          {groups.map((g: any, i: number) => (
+            <div key={i} className="listen-group">
+              <div className="listen-group-head"><span className="tag info">篇目 {i + 1}</span><b>第 {g.from}–{g.to} 题</b></div>
+              {showTranscript && g.lines?.length > 0 && (
+                <div className="transcript">
+                  {g.lines.map((l: any, j: number) => (
+                    <div key={j} className="transcript-line">
+                      <div className="en">{l.speaker && <b>{l.speaker}: </b>}{l.en}</div>
+                      {l.cn && <div className="cn">{l.cn}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
         {mat.directions && <div className="directions">{mat.directions}</div>}
       </div>
     )
@@ -49,7 +52,8 @@ export default function MaterialPanel({
     const bank = c.word_bank || []
     const parts = passage.split(/(__\(\d+\)__)/)
     return (
-      <div className="card">
+      <div className="card material-card">
+        <div className="material-head"><Icon name="book" size={16}/>选词填空 · 原文</div>
         {mat.directions && <div className="directions">{mat.directions}</div>}
         <div className="passage">
           {parts.map((p, i) => {
@@ -65,21 +69,22 @@ export default function MaterialPanel({
                   onClick={() => onBlankClick(no)}
                   title={`第 ${no} 空${availableBlanks !== undefined && !availableBlanks.includes(no) ? '（未加入本次练习）' : ''}`}
                 >
-                  {val ? `${val} (${no})` : `${no}`}
+                  {val ? <><small>{no}</small>{val}</> : no}
                 </button>
               )
             }
             return <Fragment key={i}>{p}</Fragment>
           })}
         </div>
+        <div className="material-head sub">词库 Word Bank</div>
         <div className="word-bank">
           {bank.map((w: any) => (
             <span key={w.key} className={`word${Object.values(wordAnswer).includes(w.key) ? ' used' : ''}`}>
-              <span className="k">{w.key})</span>{w.text}
+              <span className="k">{w.key}</span>{w.text}
             </span>
           ))}
         </div>
-        <div className="muted small">点击原文空位选中题目，再在题目区点击词库字母作答。已用单词会淡化显示，请按原题要求选择。</div>
+        <div className="hint">点击原文空位选中题目，再在右侧点击词库字母作答。已用单词会淡化显示。</div>
       </div>
     )
   }
@@ -87,13 +92,14 @@ export default function MaterialPanel({
   if (section === 'matching') {
     const paras = c.paragraphs || []
     return (
-      <div className="card">
-        {c.title && <b>{c.title}</b>}
+      <div className="card material-card">
+        <div className="material-head"><Icon name="book" size={16}/>长篇阅读</div>
+        {c.title && <h3 className="passage-title">{c.title}</h3>}
         {mat.directions && <div className="directions">{mat.directions}</div>}
         <div className="passage">
           {paras.map((p: any) => (
-            <div key={p.label} style={{ marginBottom: 10 }}>
-              <span className="p-label">{p.label})</span>{p.text}
+            <div key={p.label} className="para">
+              <span className="p-label">{p.label}</span>{p.text}
             </div>
           ))}
         </div>
@@ -103,7 +109,8 @@ export default function MaterialPanel({
 
   if (section === 'reading1' || section === 'reading2') {
     return (
-      <div className="card">
+      <div className="card material-card">
+        <div className="material-head"><Icon name="book" size={16}/>仔细阅读{section === 'reading1' ? ' · Passage One' : ' · Passage Two'}</div>
         {mat.directions && <div className="directions">{mat.directions}</div>}
         <div className="passage">{c.passage}</div>
         {c.passage2 && (
@@ -118,11 +125,12 @@ export default function MaterialPanel({
 
   if (section === 'writing' || section === 'translation') {
     return (
-      <div className="card">
+      <div className="card material-card">
+        <div className="material-head"><Icon name={section === 'writing' ? 'note' : 'text'} size={16}/>{section === 'writing' ? '写作题目' : '翻译题目'}</div>
         <SubjectivePrompt section={section} text={c.prompt}/>
       </div>
     )
   }
 
-  return <div className="card muted">未知题型材料。</div>
+  return <div className="card material-card muted">未知题型材料。</div>
 }

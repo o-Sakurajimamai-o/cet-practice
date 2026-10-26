@@ -1,2 +1,2 @@
 @echo off
-"%~dp0CET6-Practice.exe" --stop
+"%~dp0CET-Practice.exe" --stop

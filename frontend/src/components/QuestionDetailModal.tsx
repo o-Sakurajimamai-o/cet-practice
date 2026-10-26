@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { questionDetail } from '../api'
 import MaterialPanel from './MaterialPanel'
 import PdfProse from './PdfProse'
+import Icon from './Icon'
+import SentenceInsights from './SentenceInsights'
 
 /** 单题详情弹窗：错题/收藏回看，必须带材料与解析。 */
 export default function QuestionDetailModal({ uid, onClose }: { uid: string; onClose: () => void }) {
@@ -48,16 +50,16 @@ export default function QuestionDetailModal({ uid, onClose }: { uid: string; onC
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">
-          <b>{q ? `${q.paper_key} · ${q.section_cn} · 第 ${q.q_no} 题` : '题目详情'}</b>
+          <div className="modal-title"><small>{q ? `${q.paper_key} · ${q.section_cn}` : '题目详情'}</small><b>{q ? `第 ${q.q_no} 题` : '加载中…'}</b></div>
           {q?.status === 'needs_review' && <span className="tag warn" title={q.flags?.join('；')}>待核对</span>}
-          <button style={{ marginLeft: 'auto' }} onClick={onClose}>关闭</button>
+          <button className="icon-btn modal-close" onClick={onClose} aria-label="关闭" title="关闭（Esc）"><Icon name="close" size={18}/></button>
         </div>
         {err && <div className="notice error" role="alert">加载失败：{err}<button onClick={() => setReload(value => value + 1)}>重新加载</button></div>}
-        {!q && !err && <div className="loading">加载题目…</div>}
+        {!q && !err && <div className="loading"><span className="spinner"/>加载题目…</div>}
         {q && (
           <>
             <div className="modal-columns">
-              <div style={{ flex: '1 1 44%' }}>
+              <div className="modal-material">
                 <MaterialPanel
                   section={q.section}
                   mat={mat}
@@ -68,68 +70,69 @@ export default function QuestionDetailModal({ uid, onClose }: { uid: string; onC
                   showTranscript
                 />
               </div>
-              <div style={{ flex: '1 1 56%' }}>
+              <div className="modal-question">
                 <div className="qcard">
-                  <div className="qhead"><span className="qno">{q.q_no}.</span></div>
+                  <div className="qhead"><span className="qno">{q.q_no}</span><span className="tag">{q.section_cn}</span></div>
                   {q.stem && <div className="stem">{q.stem}</div>}
-                  {(q.options || []).map((o: any) => {
+                  <div className="opts">{(q.options || []).map((o: any) => {
                     const isAns = q.answer === o.key
                     return (
                       <div key={o.key} className={`opt${isAns ? ' correct' : ''}`}>
-                        <span className="okey">{o.key})</span>
-                        <span>{o.text}</span>
-                        {isAns && <span className="verdict">✓ 答案</span>}
+                        <span className="okey">{o.key}</span>
+                        <span className="otext">{o.text}</span>
+                        {isAns && <span className="verdict"><Icon name="check" size={14}/>答案</span>}
                       </div>
                     )
-                  })}
+                  })}</div>
                   {(q.qtype === 'essay' || q.qtype === 'translation') &&
                     mat?.content && (
                       <div className="analysis">
                         {q.qtype === 'essay' ? (
                           <>
-                            <div style={{ fontWeight: 700 }}>参考范文：</div>
+                            <div className="analysis-title">参考范文</div>
                             <PdfProse className="model-essay" text={mat.content.model_essay || '（材料中未提供）'}/>
                             {mat.content.model_essay_cn && (
-                              <><div style={{ fontWeight: 700, marginTop: 8 }}>范文中译：</div>
+                              <><div className="analysis-title">范文中译</div>
                                 <PdfProse className="model-essay" text={mat.content.model_essay_cn}/></>
                             )}
                             {mat.content.paragraph_notes && (
-                              <><div style={{ fontWeight: 700, marginTop: 8 }}>逐段解析：</div>{mat.content.paragraph_notes}</>
+                              <><div className="analysis-title">逐段解析</div><div className="analysis-text">{mat.content.paragraph_notes}</div></>
                             )}
                           </>
                         ) : (
                           <>
-                            <div style={{ fontWeight: 700 }}>参考译文：</div>
+                            <div className="analysis-title">参考译文</div>
                             <PdfProse className="model-essay" text={mat.content.reference_translation || '（材料中未提供）'}/>
                             {mat.content.sentence_notes && (
-                              <><div style={{ fontWeight: 700, marginTop: 8 }}>逐句解析：</div>{mat.content.sentence_notes}</>
+                              <><div className="analysis-title">逐句解析</div><div className="analysis-text">{mat.content.sentence_notes}</div></>
                             )}
                           </>
                         )}
                       </div>
                     )}
                   {q.qtype !== 'essay' && q.qtype !== 'translation' && (
-                    <div className="answer-line" style={{ marginTop: 8 }}>
-                      答案：
+                    <div className="answer-line">
+                      <span className="answer-key"><small>标准答案</small>
                       {q.has_answer
-                        ? <span className="ok">{q.answer}{q.answer_word ? ` (${q.answer_word})` : ''}</span>
-                        : <span className="bad">材料中未提供</span>}
-                      {q.answer_source && <div className="muted small">来源：{q.answer_source}</div>}
+                        ? <b className="ok">{q.answer}{q.answer_word ? ` · ${q.answer_word}` : ''}</b>
+                        : <b className="bad">材料中未提供</b>}</span>
+                      {q.answer_source && <div className="muted small source-line">来源：{q.answer_source}</div>}
                     </div>
                   )}
                 </div>
                 {q.analysis_text && (
-                  <div className="analysis" style={{ maxHeight: 320 }}>
-                    <div style={{ fontWeight: 700, marginBottom: 6 }}>解析：</div>
-                    {q.analysis_text}
+                  <div className="analysis">
+                    <div className="analysis-title">解析</div>
+                    <div className="analysis-text">{q.analysis_text}</div>
                   </div>
                 )}
+                <SentenceInsights materials={q.materials}/>
                 {q.note && (
-                  <div className="card"><b>我的笔记：</b><div className="analysis" style={{ border: 'none', background: 'none', padding: 0 }}>{q.note}</div></div>
+                  <div className="analysis note-view"><div className="analysis-title"><Icon name="note" size={15}/>我的笔记</div><div className="analysis-text">{q.note}</div></div>
                 )}
                 {q.source_file && (
-                  <a className="muted small" href={`/api/pdf?path=${encodeURIComponent(q.source_file)}#page=${q.source_page || 1}`} target="_blank" rel="noreferrer">
-                    查看原 PDF（第 {q.source_page || 1} 页附近）
+                  <a className="pdf-link" href={`/api/pdf?path=${encodeURIComponent(q.source_file)}#page=${q.source_page || 1}`} target="_blank" rel="noreferrer">
+                    <Icon name="file" size={15}/>查看原 PDF（第 {q.source_page || 1} 页附近）
                   </a>
                 )}
               </div>

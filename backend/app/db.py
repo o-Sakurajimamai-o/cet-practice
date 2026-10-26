@@ -152,6 +152,7 @@ def init_db() -> None:
         # Inspect columns explicitly: an unrelated migration failure must not be hidden.
         conn.execute("BEGIN IMMEDIATE")
         migrations = {
+            "papers": {"exam_type": "TEXT NOT NULL DEFAULT 'cet6'", "shared_sources_json": "TEXT NOT NULL DEFAULT '{}'"},
             "sessions": {
                 "scope_json": "TEXT NOT NULL DEFAULT '[]'",
                 "state_revision": "INTEGER NOT NULL DEFAULT 0",

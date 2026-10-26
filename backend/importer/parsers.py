@@ -14,7 +14,7 @@ from .extract import PdfDoc, norm_space
 _OPT = re.compile(r"^\s*([A-O])\)\s*(.*)$")
 _Q_HEAD = re.compile(r"^\s*(\d{1,2})\.\s+(.*)$")
 _PARA_HEAD = re.compile(r"^\s*([A-Z])\)\s*(.*)$")
-_QGRP = re.compile(r"Questions\s+(\d+)\s+to\s+(\d+)\s+are\s+based\s+on")
+_QGRP = re.compile(r"Questions\s+(\d+)\s+(?:to|and)\s+(\d+)\s+are\s+based\s+on")
 _PASSAGE_HEAD = re.compile(r"^\s*Passage\s+(One|Two|Three)\b", re.IGNORECASE)
 _DIR_HEAD = re.compile(r"^\s*Directions\s*:", re.IGNORECASE)
 _SECTION_HEAD = re.compile(r"^\s*Section\s+([A-C])\s*$", re.IGNORECASE)

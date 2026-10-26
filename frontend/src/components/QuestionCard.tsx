@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNoteDraft, rememberNoteDraft, persistNoteDraft } from '../noteDrafts'
 import PdfProse from './PdfProse'
+import Icon from './Icon'
+import SentenceInsights from './SentenceInsights'
 
 /** 单题卡片：按题型渲染点击作答交互；交卷后显示对错。 */
 export default function QuestionCard({
@@ -99,54 +101,58 @@ export default function QuestionCard({
   }
 
   return (
-    <div className={`qcard${isCurrent ? ' current-q' : ''}`} id={`q-${q.uid}`}>
+    <div className={`qcard${isCurrent ? ' current-q' : ''}${verdict ? ` verdict-${verdict}` : ''}`} id={`q-${q.uid}`}>
       <div className="qhead">
-        <span className="qno">{q.q_no}.</span>
+        <span className="qno">{q.q_no}</span>
         <span className="tag">{q.section_cn}</span>
         {q.paper_key && <span className="muted small">{q.paper_key}</span>}
         {q.status === 'needs_review' && <span className="tag warn" title={q.flags?.join('；')}>待核对</span>}
         {!q.has_answer && q.qtype !== 'essay' && q.qtype !== 'translation' && (
           <span className="tag warn">无标准答案（不判分）</span>
         )}
+        {submitted && verdict === 'correct' && <span className="tag ok"><Icon name="check" size={13}/>答对</span>}
+        {submitted && verdict === 'wrong' && <span className="tag err"><Icon name="close" size={13}/>答错</span>}
         <button
-          style={{ marginLeft: 'auto', padding: '2px 10px' }}
+          className={`fav-btn${favorite ? ' on' : ''}`}
           title={favorite ? '取消收藏' : '收藏本题'}
           aria-label={favorite ? `取消收藏第 ${q.q_no} 题` : `收藏第 ${q.q_no} 题`}
           aria-pressed={favorite}
           disabled={favoriteLoading}
           onClick={toggleFavorite}
-        >{favorite ? '★' : '☆'}</button>
+        ><Icon name={favorite ? 'starFilled' : 'star'} size={19}/></button>
       </div>
       {favoriteError && <div className="muted small" role="alert">{favoriteError}</div>}
 
       {q.qtype === 'mcq' && (
         <>
           {q.stem && <div className="stem">{q.stem}</div>}
-          {(q.options || []).map((o: any) => {
-            let cls = 'opt'
-            const selected = answer === o.key
-            if (selected) cls += ' selected'
-            if (canShowAnalysis && q.answer) {
-              if (o.key === q.answer) cls += ' correct'
-              else if (selected) cls += ' wrong'
-            }
-            return (
-              <button key={o.key} className={cls}
-                disabled={submitted || saving}
-                aria-pressed={selected}
-                onClick={() => onAnswer(o.key)}
-              >
-                <span className="okey">{o.key})</span>
-                <span>{o.text}</span>
-                {canShowAnalysis && q.answer && o.key === q.answer && (
-                  <span className="verdict">✓ 正确答案</span>
-                )}
-                {canShowAnalysis && selected && q.answer && o.key !== q.answer && (
-                  <span className="verdict">✗ 你的选择</span>
-                )}
-              </button>
-            )
-          })}
+          <div className="opts">
+            {(q.options || []).map((o: any) => {
+              let cls = 'opt'
+              const selected = answer === o.key
+              if (selected) cls += ' selected'
+              if (canShowAnalysis && q.answer) {
+                if (o.key === q.answer) cls += ' correct'
+                else if (selected) cls += ' wrong'
+              }
+              return (
+                <button key={o.key} className={cls}
+                  disabled={submitted || saving}
+                  aria-pressed={selected}
+                  onClick={() => onAnswer(o.key)}
+                >
+                  <span className="okey">{o.key}</span>
+                  <span className="otext">{o.text}</span>
+                  {canShowAnalysis && q.answer && o.key === q.answer && (
+                    <span className="verdict"><Icon name="check" size={14}/>正确答案</span>
+                  )}
+                  {canShowAnalysis && selected && q.answer && o.key !== q.answer && (
+                    <span className="verdict"><Icon name="close" size={14}/>你的选择</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </>
       )}
 
@@ -155,7 +161,7 @@ export default function QuestionCard({
           {q.stem && (
             <div className="stem muted">
               {q.stem.split(/__\(\d+\)__/).map((s: string, i: number, arr: any[]) => (
-                <span key={i}>{s}{i < arr.length - 1 ? <b style={{ color: 'var(--primary)' }}>［{q.q_no}］</b> : null}</span>
+                <span key={i}>{s}{i < arr.length - 1 ? <b className="blank-ref">{answer ? `${q.q_no} · ${answer}` : q.q_no}</b> : null}</span>
               ))}
             </div>
           )}
@@ -173,7 +179,7 @@ export default function QuestionCard({
               )
             })}
           </div>
-          <div className="muted small">点击字母选择填入本空的词。</div>
+          <div className="hint">点击字母选择填入本空的词，悬停可查看对应单词。</div>
         </>
       )}
 
@@ -193,13 +199,13 @@ export default function QuestionCard({
               )
             })}
           </div>
-          <div className="muted small">点击段落字母作答（同一段落可被多题选择）。</div>
+          <div className="hint">点击段落字母作答（同一段落可被多题选择）。</div>
         </>
       )}
 
       {(q.qtype === 'essay' || q.qtype === 'translation') && (
         <>
-          <div className="muted small">
+          <div className="hint">
             此题由你自行完成，可只看题目；下方文本框仅用于记录草稿（可不填，不判分，不影响交卷）。
           </div>
           <textarea
@@ -209,6 +215,7 @@ export default function QuestionCard({
             disabled={submitted || saving}
             onChange={(e) => onAnswer(e.target.value)}
           />
+          {typeof answer === 'string' && answer.trim() && <div className="hint">约 {answer.trim().split(/\s+/).length} 词</div>}
         </>
       )}
 
@@ -216,27 +223,31 @@ export default function QuestionCard({
         <div className="analysis">
           {q.qtype !== 'essay' && q.qtype !== 'translation' && (
             <div className="answer-line">
-              标准答案：
-              {q.has_answer
-                ? <span className="ok">{q.answer}{q.answer_word ? ` (${q.answer_word})` : ''}</span>
-                : <span className="bad">材料中未提供（本题不判分）</span>}
+              <span className="answer-key">
+                <small>标准答案</small>
+                {q.has_answer
+                  ? <b className="ok">{q.answer}{q.answer_word ? ` · ${q.answer_word}` : ''}</b>
+                  : <b className="bad">材料中未提供（本题不判分）</b>}
+              </span>
               {submitted && detail && (
-                <span> ｜ 你的作答：
-                  {detail.choice ? <b>{detail.choice}</b> : <span className="muted">未作答</span>}
-                  {verdict === 'correct' && <span className="ok"> ✓ 正确</span>}
-                  {verdict === 'wrong' && <span className="bad"> ✗ 错误</span>}
-                  {verdict === 'unanswered' && <span className="muted">（未作答）</span>}
-                  {verdict === 'no_key' && <span className="muted">（无标准答案，不计分）</span>}
-                  {detail.revealed && <span className="tag warn" style={{ marginLeft: 8 }}>练习中看过答案</span>}
+                <span className="answer-key">
+                  <small>你的作答</small>
+                  <b className={verdict === 'correct' ? 'ok' : verdict === 'wrong' ? 'bad' : ''}>
+                    {detail.choice || '未作答'}
+                    {verdict === 'correct' && ' ✓'}
+                    {verdict === 'wrong' && ' ✗'}
+                  </b>
+                  {verdict === 'no_key' && <span className="muted small">无标准答案，不计分</span>}
+                  {detail.revealed && <span className="tag warn">练习中看过答案</span>}
                 </span>
               )}
             </div>
           )}
-          {q.answer_source && <div className="muted small">答案来源：{q.answer_source}</div>}
+          {q.answer_source && <div className="muted small source-line">答案来源：{q.answer_source}</div>}
           {q.analysis_text && (
             <>
-              <div style={{ fontWeight: 700, marginTop: 8 }}>解析（来自解析 PDF）：</div>
-              {q.analysis_text}
+              <div className="analysis-title">解析</div>
+              <div className="analysis-text">{q.analysis_text}</div>
             </>
           )}
           {q.qtype === 'essay' && analysisData?.materials?.map((m: any, i: number) => {
@@ -245,20 +256,20 @@ export default function QuestionCard({
               <div key={i}>
                 {c.model_essay && (
                   <>
-                    <div style={{ fontWeight: 700, marginTop: 8 }}>参考范文：</div>
+                    <div className="analysis-title">参考范文</div>
                     <PdfProse className="model-essay" text={c.model_essay}/>
                   </>
                 )}
                 {c.model_essay_cn && (
                   <>
-                    <div style={{ fontWeight: 700, marginTop: 8 }}>范文中译：</div>
+                    <div className="analysis-title">范文中译</div>
                     <PdfProse className="model-essay" text={c.model_essay_cn}/>
                   </>
                 )}
                 {c.paragraph_notes && (
                   <>
-                    <div style={{ fontWeight: 700, marginTop: 8 }}>逐段写作解析：</div>
-                    {c.paragraph_notes}
+                    <div className="analysis-title">逐段写作解析</div>
+                    <div className="analysis-text">{c.paragraph_notes}</div>
                   </>
                 )}
               </div>
@@ -270,24 +281,26 @@ export default function QuestionCard({
               <div key={i}>
                 {c.reference_translation && (
                   <>
-                    <div style={{ fontWeight: 700, marginTop: 8 }}>参考译文：</div>
+                    <div className="analysis-title">参考译文</div>
                     <PdfProse className="model-essay" text={c.reference_translation}/>
                   </>
                 )}
                 {c.sentence_notes && (
                   <>
-                    <div style={{ fontWeight: 700, marginTop: 8 }}>逐句解析：</div>
-                    {c.sentence_notes}
+                    <div className="analysis-title">逐句解析</div>
+                    <div className="analysis-text">{c.sentence_notes}</div>
                   </>
                 )}
               </div>
             )
           })}
+          <SentenceInsights materials={analysisData?.materials || loadedDetail?.materials}/>
           {/* 笔记 */}
-          <div style={{ marginTop: 10 }}>
+          <div className="note-box">
+            <div className="analysis-title"><Icon name="note" size={15}/>我的笔记</div>
             <textarea
-              className="essay" style={{ minHeight: 60 }}
-              placeholder="笔记（仅自己可见，随备份导出）"
+              className="essay note"
+              placeholder="记下易错点、生词或思路（仅自己可见，随备份导出）"
               value={note}
               maxLength={10000}
               disabled={remoteNote === null}
@@ -303,25 +316,24 @@ export default function QuestionCard({
       )}
 
       {analysisError && <div className="notice error" role="alert">{analysisError}</div>}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+      <div className="qactions">
         {!submitted && (
-          <button disabled={analysisLoading || saving} onClick={toggleAnalysis}>
-            {analysisLoading ? '正在加载解析…' : showAnalysis ? '收起解析' : '查看解析（会记录）'}
+          <button className="ghost" disabled={analysisLoading || saving} onClick={toggleAnalysis}>
+            <Icon name="eye" size={16}/>{analysisLoading ? '正在加载解析…' : showAnalysis ? '收起解析' : '查看解析（会记录）'}
           </button>
         )}
         {submitted && !showAnalysis && (
-          <button disabled={analysisLoading || saving} onClick={toggleAnalysis}>{analysisLoading ? '正在加载解析…' : '查看解析'}</button>
+          <button className="ghost" disabled={analysisLoading || saving} onClick={toggleAnalysis}><Icon name="eye" size={16}/>{analysisLoading ? '正在加载解析…' : '查看解析'}</button>
         )}
         {submitted && showAnalysis && (
-          <button onClick={toggleAnalysis}>收起解析</button>
+          <button className="ghost" onClick={toggleAnalysis}><Icon name="eye" size={16}/>收起解析</button>
         )}
         {q.source_file && (
           <a
-            className="muted small"
-            style={{ alignSelf: 'center' }}
+            className="pdf-link"
             href={`/api/pdf?path=${encodeURIComponent(q.source_file)}#page=${q.source_page || 1}`}
             target="_blank" rel="noreferrer"
-          >原 PDF（第 {q.source_page || 1} 页附近）</a>
+          ><Icon name="file" size={15}/>原 PDF（第 {q.source_page || 1} 页附近）</a>
         )}
       </div>
     </div>

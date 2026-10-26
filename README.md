@@ -1,33 +1,21 @@
-# 六级研习室 · CET6 Practice
+# 四六级研习室 · CET Practice
 
-Windows 本地六级练习工具。下载便携版后，无需安装 Python 或 Node.js；题目、答案、解析、音频和练习记录均在本机使用。
-感谢 Linux Do 社区：https://linux.do/
+Windows 本地四六级练习工具，题目、解析、听力和练习记录都在本机使用。
 
-## 普通用户下载
+感谢 [Linux Do 社区](https://linux.do/)。
 
-进入 [Releases](https://github.com/o-Sakurajimamai-o/cet6-practice/releases)，下载 `CET6-Practice-v1.0.0-Windows-x64.zip`，完整解压到自己可写入的文件夹，再双击 `CET6-Practice.exe`。不要在压缩包内直接运行，不要只复制 EXE。
+## 下载使用
 
-程序会自动打开浏览器。保留服务窗口；停止时双击 `Stop.bat`，或在服务窗口按 Ctrl+C。端口被其他软件使用时会选择空闲端口，不会结束其他软件。重复启动同一份程序会打开已有实例。
+进入 [Releases](https://github.com/o-Sakurajimamai-o/cet-practice/releases/latest)，下载 `CET-Practice-v1.1.0-Windows-x64.zip`，完整解压后双击 `CET-Practice.exe`，浏览器会自动打开，无需安装 Python 或 Node.js。停止时运行 `Stop.bat`。
 
-标准包包含 76 套、3467 题，其中 3315 道客观题，以及现有的 49 套听力音频。其余套次的源材料本身不带听力，页面会提示。作文和翻译供练习、参考，不自动评分。
+包含四级 2020—2026 年 46 套、六级 2015—2026 年 76 套，共 6,089 题；含现有 76 份独立听力。部分四级套次按来源标注共用材料。支持作答保存、错题、收藏、笔记和句子精讲。
+
+旧版用户请解压到新目录，再用「备份与恢复」迁移记录。个人数据保存在程序旁的 `data` 文件夹，分享时请发送原始发布压缩包。
 
 ## 可选原 PDF
 
-题干、答案和解析已存入数据库，标准包正常使用不依赖原 PDF。需要对照原卷时，再下载 `CET6-Practice-v1.0.0-Optional-PDF.zip`，将其中 `CET6-Practice/resources` 合并到程序目录的 `resources`。未安装时，原 PDF 链接会显示安装说明。
+需要对照原卷时，下载同版本 `Optional-PDF` 补充包，将其中的 `resources` 合并到程序目录。日常刷题、解析、句子精讲和听力无需此包。
 
-开发环境：Windows x64、Python 3.12、Node.js 18+（本次使用 Node 24）。
+题库使用第三方参考答案，来源分歧保留在「题库报告」中；练习正确率不是四六级考试成绩。
 
-```powershell
-python -m venv backend/venv
-backend/venv/Scripts/python.exe -m pip install -r backend/requirements-runtime.txt
-cd frontend
-npm ci
-npm run build
-cd ..
-backend/venv/Scripts/python.exe packaging/launcher.py
-```
-
-构建便携版：安装 `packaging/requirements-build.txt`，准备好 `seed` 和 `resources`，运行 `python packaging/build_windows.py`。构建输出为 `dist/CET6-Practice`。
-
-第三方许可见 `THIRD_PARTY_NOTICES.md` 与 `third_party_licenses/`。源码、第三方依赖和考试材料各自的权利范围分别适用，公开仓库不为所有材料额外授予统一许可证。
-
+源码运行与打包见 [构建说明](docs/BUILD.md)。第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

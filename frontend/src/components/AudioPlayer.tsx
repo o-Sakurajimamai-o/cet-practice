@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import Icon from './Icon'
 
 /** 听力播放器：播放/暂停/继续、拖动进度、音量、倍速；位置由外部恢复与保存。 */
 export default function AudioPlayer({
@@ -60,8 +61,8 @@ export default function AudioPlayer({
 
   if (!hasAudio || !src) {
     return (
-      <div className="audio-bar">
-        <span className="no-audio">⚠ 本套次缺少听力音频文件，无法播放（听力题仍可练习）</span>
+      <div className="audio-bar no-audio-bar">
+        <span className="no-audio"><Icon name="alert" size={17}/>本套次缺少听力音频文件，无法播放（听力题仍可练习）</span>
       </div>
     )
   }
@@ -111,28 +112,32 @@ export default function AudioPlayer({
         }}
         onEnded={e => { setPlaying(false); onPosRef.current(e.currentTarget.currentTime) }}
       />
-      <button className="play" disabled={paused} onClick={toggle}>{playing ? '⏸ 暂停' : '▶ 播放'}</button>
-      <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: 96 }}>{fmt(cur)} / {fmt(dur)}</span>
-      <input
-        aria-label="听力播放进度"
-        type="range" min={0} max={dur || 0} step={0.5} value={cur}
-        disabled={paused || !dur}
-        style={{ flex: '1 1 160px', minWidth: 120 }}
-        onChange={(e) => {
-          const v = Number(e.target.value)
-          setCur(v)
-          if (ref.current) ref.current.currentTime = v
-          onPos(v)
-        }}
-      />
-      <label>音量 <input type="range" min={0} max={1} step={0.05} value={vol}
+      <button className={`play${playing ? ' playing' : ''}`} disabled={paused} onClick={toggle} aria-label={playing ? '暂停' : '播放'}><Icon name={playing ? 'pause' : 'play'} size={18}/></button>
+      <div className="audio-main">
+        <div className="audio-caption"><span><Icon name="headphones" size={15}/>听力音频</span><span className="audio-time">{fmt(cur)} <i>/</i> {fmt(dur)}</span></div>
+        <input
+          className="audio-progress"
+          aria-label="听力播放进度"
+          type="range" min={0} max={dur || 0} step={0.5} value={cur}
+          disabled={paused || !dur}
+          style={{ '--fill': `${dur ? (cur / dur) * 100 : 0}%` } as React.CSSProperties}
+          onChange={(e) => {
+            const v = Number(e.target.value)
+            setCur(v)
+            if (ref.current) ref.current.currentTime = v
+            onPos(v)
+          }}
+        />
+      </div>
+      <label className="audio-volume" title="音量"><Icon name="volume" size={17}/><span className="visually-hidden">音量</span><input type="range" min={0} max={1} step={0.05} value={vol}
+        style={{ '--fill': `${vol * 100}%` } as React.CSSProperties}
         onChange={(e) => { const v = Number(e.target.value); setVol(v); if (ref.current) ref.current.volume = v }} /></label>
-      <label>倍速
+      <label className="audio-rate" title="倍速"><span className="visually-hidden">倍速</span>
         <select value={rate} onChange={(e) => {
           const v = Number(e.target.value); setRate(v)
           if (ref.current) ref.current.playbackRate = v
-        }} style={{ marginLeft: 4 }}>
-          {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => <option key={r} value={r}>{r}x</option>)}
+        }}>
+          {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => <option key={r} value={r}>{r}×</option>)}
         </select>
       </label>
       {error && <div className="audio-error" role="alert">{error}</div>}

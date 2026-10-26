@@ -18,9 +18,11 @@ from pathlib import Path
 from . import analysis_parsers as A
 from . import parsers as P
 from .extract import extract_pdf, file_checksum, norm_space
+from .reflow import reflow_section
 
+ROOT = Path(os.environ.get("CET_RESOURCE_ROOT", os.environ.get("CET6_RESOURCE_ROOT", Path(__file__).resolve().parents[2] / "resources")))
 PROJECT = Path(__file__).resolve().parents[2]
-ROOT = Path(os.environ.get("CET6_RESOURCE_ROOT", PROJECT / "resources"))
+EXAM = os.environ.get("CET_EXAM", "cet6")
 sys.path.insert(0, str(PROJECT / "backend"))
 from app import db  # noqa: E402
 
@@ -43,9 +45,13 @@ EXPECTED = {"listening": 25, "cloze": 10, "matching": 10, "reading1": 5, "readin
 PARSER_VERSION = 'source-layout-audit-v6-clean-all-explanations-and-reviewed-fixes'
 CORRECTIONS_PATH = Path(__file__).with_name('reviewed_corrections.json')
 
+def load_corrections():
+    path = Path(__file__).with_name('reviewed_corrections_cet4.json') if EXAM == 'cet4' else CORRECTIONS_PATH
+    return json.loads(path.read_text(encoding='utf-8'))['corrections']
+
 
 def reviewed_analysis(uid, answer, text):
-    corrections = json.loads(CORRECTIONS_PATH.read_text(encoding='utf-8'))['corrections']
+    corrections = load_corrections()
     fix = corrections.get(uid)
     if not fix:
         return text
@@ -71,13 +77,14 @@ def reviewed_analysis(uid, answer, text):
 def scan_root() -> list[dict]:
     """扫描题库根目录，产出套次材料清单。"""
     papers = []
-    for date_dir in sorted(d for d in ROOT.iterdir() if d.is_dir() and re.match(r"\d{4}-\d{2}", d.name)):
+    source_root = ROOT / "cet4" if EXAM == "cet4" else ROOT
+    for date_dir in sorted(d for d in source_root.iterdir() if d.is_dir() and re.match(r"\d{4}-\d{2}", d.name)):
         year, month = (int(x) for x in date_dir.name.split("-"))
         for set_dir in sorted(d for d in date_dir.iterdir() if d.is_dir() and d.name.startswith("第")):
             m = re.search(r"(\d+)", set_dir.name)
             set_no = int(m.group(1)) if m else 0
             entry = {
-                "paper_key": f"{date_dir.name}-{set_no}",
+                "paper_key": ("cet4-" if EXAM == "cet4" else "") + f"{date_dir.name}-{set_no}",
                 "year": year, "month": month, "set_no": set_no,
                 "dir": set_dir, "sections": {}, "audio": None,
                 "raw_pdfs": [],
@@ -96,6 +103,30 @@ def scan_root() -> list[dict]:
                 entry["audio"] = f
                 break
             papers.append(entry)
+    if EXAM == 'cet4':
+        mapping_path = ROOT / 'cet4' / 'shared-mapping.json'
+        mappings = json.loads(mapping_path.read_text(encoding='utf8')).get('papers', {}) if mapping_path.exists() else {}
+        indexed = {p['paper_key']: p for p in papers}
+        def resolve_shared(entry, seen):
+            if entry['paper_key'] in seen:
+                raise ValueError('Cyclic shared material mapping: '+entry['paper_key'])
+            seen = seen | {entry['paper_key']}
+            sources = mappings.get(entry['paper_key'], {})
+            entry['shared_sources'] = sources
+            for section, evidence in sources.items():
+                target_key = 'cet4-'+evidence['source_slug']
+                if target_key not in indexed:
+                    raise ValueError('Shared source missing: '+target_key)
+                target = indexed[target_key]
+                resolve_shared(target, seen)
+                if section not in entry['sections'] and section in target['sections']:
+                    entry['sections'][section] = target['sections'][section]
+                    for path in target['sections'][section]:
+                        if path and path not in entry['raw_pdfs']: entry['raw_pdfs'].append(path)
+                if section == 'listening' and not entry['audio']:
+                    entry['audio'] = target['audio']
+        for entry in papers:
+            resolve_shared(entry, set())
     return papers
 
 
@@ -135,6 +166,7 @@ class Importer:
                 "UPDATE papers SET audio_path=?, import_version=? WHERE id=?",
                 (rel(entry["audio"]), self.version, paper_id),
             )
+        self.conn.execute("UPDATE papers SET exam_type=?, shared_sources_json=? WHERE id=?", (EXAM, json.dumps(entry.get("shared_sources", {}), ensure_ascii=False), paper_id))
         # 材料索引（全部 PDF，含整卷）
         for f in entry["raw_pdfs"]:
             kind = "analysis" if "解析PDF" in str(f) else "question"
@@ -148,7 +180,7 @@ class Importer:
                 )
             except OSError as e:
                 self.issue(pk, "file", None, "warn", f"材料读取失败 {rel(f)}: {e}")
-        report = {"paper_key": pk, "sections": {}, "status": "imported"}
+        report = {"paper_key": pk, "sections": {}, "status": "imported", "shared_sources": entry.get("shared_sources", {})}
         sec_flags_map = {}
         for sec in SECTION_FILES:
             if sec not in entry["sections"]:
@@ -226,6 +258,16 @@ class Importer:
             self._do_writing(paper_id, pk, qdoc, adoc, qf, af, rep)
         elif sec == "translation":
             self._do_translation(paper_id, pk, qdoc, adoc, qf, af, rep)
+        if adoc and adoc.appendix_pages:
+            material = self.conn.execute("SELECT id, content_json FROM section_materials WHERE paper_id=? AND section=? ORDER BY id LIMIT 1", (paper_id, sec)).fetchone()
+            if material:
+                content = json.loads(material['content_json'] or '{}')
+                content['sentence_insights'] = adoc.appendix_pages
+                content['sentence_insights_source'] = rel(af)
+                self.conn.execute("UPDATE section_materials SET content_json=? WHERE id=?", (json.dumps(content, ensure_ascii=False), material['id']))
+            rep['sentence_insights_pages'] = len(adoc.appendix_pages)
+        # PDF 物理行入库后会在网页上断成半句，按版面坐标合并软换行。
+        rep['reflowed'] = reflow_section(self.conn, paper_id, sec, [qf, af])
         return rep
 
     # -------------------------------------------------- 各题型入库
@@ -312,7 +354,11 @@ class Importer:
             qa = ana.per_q.get(q.q_no) if ana else None
             answer = qa.answer if qa else None
             uid = f'{pk}:{sec}:{q.q_no}'
-            fix = json.loads(CORRECTIONS_PATH.read_text(encoding='utf-8'))['corrections'].get(uid, {})
+            fix = load_corrections().get(uid, {})
+            if fix.get('disputed'):
+                self.issue(pk, sec, uid, 'warn', fix['note'])
+                if '来源有分歧，详见复核说明' not in q.flags:
+                    q.flags.append('来源有分歧，详见复核说明')
             if 'source_answer' in fix:
                 if answer != fix['source_answer']:
                     raise ValueError(f'{uid}: 源答案已改变，需重新复核，禁止静默套用修正')
@@ -361,7 +407,7 @@ class Importer:
         transcripts = []
         if adoc is not None:
             transcripts = A.extract_transcripts(adoc)
-        markers = re.findall(r"Questions\s+(\d+)\s+to\s+(\d+)\s+are\s+based\s+on", qdoc.text)
+        markers = re.findall(r"Questions\s+(\d+)\s+(?:to|and)\s+(\d+)\s+are\s+based\s+on", qdoc.text)
         if len(transcripts) == len(markers) and transcripts:
             self.conn.execute("DELETE FROM section_materials WHERE paper_id=? AND section='listening' AND group_key='raw_transcript' AND manual_locked=0", (paper_id,))
             for gi, mk in enumerate(markers):
@@ -627,7 +673,11 @@ class Importer:
         rep["reference_translation"] = bool(ana and ana.reference_translation)
 
 
-def run(papers_filter: list[str] | None = None, force: bool = False):
+def run(papers_filter: list[str] | None = None, force: bool = False, exam: str | None = None):
+    global EXAM
+    EXAM = exam or EXAM
+    if EXAM not in ("cet4", "cet6"):
+        raise ValueError("exam must be cet4 or cet6")
     db.init_db()
     version = datetime.now().strftime("%Y%m%d-%H%M%S")
     conn = db.connect()
@@ -651,6 +701,11 @@ def run(papers_filter: list[str] | None = None, force: bool = False):
         }
         # A test/recovery database must never overwrite the live bank's report.
         out = db.DB_PATH.parent / "import-report.json"
+        if out.exists():
+            previous = json.loads(out.read_text(encoding="utf8"))
+            merged = {p["paper_key"]: p for p in previous.get("papers", [])}
+            merged.update({p["paper_key"]: p for p in reports})
+            summary["papers"] = sorted(merged.values(), key=lambda p: p["paper_key"])
         # 问题入库：只清理本次实际重导的套次，未变更套次的历史问题保留
         for report in reports:
             for section, result in report['sections'].items():
@@ -695,5 +750,6 @@ if __name__ == "__main__":
     ap_ = argparse.ArgumentParser()
     ap_.add_argument("--paper", action="append", help="仅导入指定套次，如 2023-06-1")
     ap_.add_argument("--force", action="store_true", help="忽略校验和缓存强制重导")
+    ap_.add_argument("--exam", choices=["cet4", "cet6"], default="cet6")
     args = ap_.parse_args()
-    run(papers_filter=args.paper, force=args.force)
+    run(papers_filter=args.paper, force=args.force, exam=args.exam)

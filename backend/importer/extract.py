@@ -10,7 +10,7 @@ import pymupdf
 
 # 逐行匹配即可整行丢弃的页眉/页脚/水印
 _DROP_LINE = re.compile(
-    r"^\s*(懒笔记\s*·|在线使用效果更好|真题卷第\d+套\(\d{4}-\d{2}\)\s*[•·]\s*(?:英语)?六级\s*$)\s*"
+    r"^\s*(懒笔记\s*·|在线使用效果更好|真题卷第\d+套\(\d{4}-\d{2}\)\s*[•·]\s*(?:英语)?[四六]级\s*$)\s*"
 )
 # 听力真题开头的在线收听引导块
 _LISTENING_PROMO = re.compile(
@@ -48,6 +48,7 @@ class PdfDoc:
     text: str = ""
     layout_pages: list[str] = field(default_factory=list)
     transcript_text: str = ""
+    appendix_pages: list[dict] = field(default_factory=list)
 
     def page_of_offset(self, offset: int) -> int:
         """全文 offset 所在页码（1 起）。"""
@@ -65,19 +66,40 @@ def extract_pdf(path: str | Path, *, layout: bool = False, transcript: bool = Fa
     pages: list[str] = []
     layout_pages: list[str] = []
     transcript_pages: list[str] = []
+    appendix_pages: list[dict] = []
+    appendix_started = False
     for i, page in enumerate(doc):
-        t = page.get_text("text")
+        # PDF text insertion order can place the appendix heading before the
+        # remaining real question explanation. Crop by its visible coordinates,
+        # then keep blank page slots so original source page numbers stay valid.
+        if appendix_started:
+            appendix_pages.append({"page": i + 1, "text": _clean_page_text(page.get_text("text"), False)})
+            pages.append("")
+            if layout: layout_pages.append("")
+            if transcript: transcript_pages.append("")
+            continue
+        clip = page.rect
+        headings = [block for block in page.get_text("blocks")
+                    if len(block) > 4 and isinstance(block[4], str)
+                    and "SENTENCEINSIGHTS" in re.sub(r"\s+", "", block[4]).upper()
+                    and "句子精讲" in block[4]]
+        if headings:
+            cutoff = min(block[1] for block in headings)
+            clip = pymupdf.Rect(0, 0, page.rect.width, max(0, cutoff - 1))
+            appendix_started = True
+            appendix_pages.append({"page": i + 1, "text": _clean_page_text(page.get_text("text", clip=pymupdf.Rect(0, cutoff - 1, page.rect.width, page.rect.height)), False)})
+        t = page.get_text("text", clip=clip)
         t = _clean_page_text(t, is_first_page=(i == 0))
         pages.append(t)
         if layout:
-            positioned = page.get_text("text", sort=True)
+            positioned = page.get_text("text", sort=True, clip=clip)
             # Mark before rstrip: an em space at the right margin belongs to the
             # blank-number span and would otherwise be lost during page cleaning.
             positioned = re.sub(r"(?<!\d)(\d{1,2})\u2003", lambda m: f"__({m.group(1)})__ ", positioned)
             layout_pages.append(_clean_page_text(positioned, i == 0))
         if transcript:
             marked_lines = []
-            for block in page.get_text("dict")["blocks"]:
+            for block in page.get_text("dict", clip=clip)["blocks"]:
                 for line in block.get("lines", []):
                     spans = []
                     for span in line["spans"]:
@@ -93,7 +115,7 @@ def extract_pdf(path: str | Path, *, layout: bool = False, transcript: bool = Fa
             transcript_pages.append(_clean_page_text("\n".join(marked_lines), i == 0))
     doc.close()
     return PdfDoc(pages=pages, text="\n".join(pages), layout_pages=layout_pages,
-                  transcript_text="\n".join(transcript_pages))
+                  transcript_text="\n".join(transcript_pages), appendix_pages=appendix_pages)
 
 
 def norm_space(s: str) -> str:

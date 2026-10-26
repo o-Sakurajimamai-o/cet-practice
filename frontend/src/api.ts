@@ -51,6 +51,6 @@ export const fixQuestion = (uid: string, field: string, value: any) =>
 export const wrongBook = () => api('/api/review/wrong')
 export const favoritesList = () => api('/api/review/favorites')
 export const historyList = () => api('/api/history')
-export const reportApi = () => api('/api/report')
+export const reportApi = (exam?: string) => api(`/api/report${exam ? `?exam=${encodeURIComponent(exam)}` : ''}`)
 export const backupImport = (data: object, merge: boolean) =>
   api(`/api/backup/import?merge=${merge}`, { method: 'POST', body: JSON.stringify({ data }) })

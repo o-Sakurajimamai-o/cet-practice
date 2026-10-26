@@ -5,8 +5,8 @@
 from __future__ import annotations
 
 import json
-import os
 import hmac
+import os
 import math
 import mimetypes
 import sqlite3
@@ -26,10 +26,10 @@ from pydantic import BaseModel, Field
 from . import db
 
 PROJECT = Path(os.environ.get("CET6_PROJECT_DIR", Path(__file__).resolve().parents[2]))
-ROOT = Path(os.environ.get("CET6_RESOURCE_ROOT", PROJECT / "resources"))
+ROOT = Path(os.environ.get("CET_RESOURCE_ROOT", os.environ.get("CET6_RESOURCE_ROOT", PROJECT / "resources")))
 FRONTEND_DIST = Path(os.environ.get("CET6_FRONTEND_DIST", PROJECT / "frontend" / "dist"))
 
-app = FastAPI(title="六级刷题", docs_url=None, redoc_url=None)
+app = FastAPI(title="四六级研习室", docs_url=None, redoc_url=None)
 
 
 @app.exception_handler(RequestValidationError)
@@ -105,11 +105,13 @@ def _normalize_fix(conn, question, field: str, value):
 # ================================================================ 试卷库
 @app.get("/api/papers")
 def list_papers(year: int | None = None, month: int | None = None,
-                section: str | None = None):
+                section: str | None = None, exam: Literal["cet4", "cet6"] | None = None):
     conn = db.connect()
     try:
         sql = "SELECT * FROM papers"
         cond, args = [], []
+        if exam:
+            cond.append("exam_type=?"); args.append(exam)
         if year:
             cond.append("year=?"); args.append(year)
         if month:
@@ -134,6 +136,7 @@ def list_papers(year: int | None = None, month: int | None = None,
             p["objective_total"] = obj_n
             p["objective_keyed"] = obj_key
             p["has_audio"] = bool(p["audio_path"])
+            p["shared_sources"] = json.loads(p.get("shared_sources_json") or "{}")
             s = conn.execute(
                 "SELECT id, started_at, updated_at, submitted_at, answers_json FROM sessions WHERE paper_id=? AND mode='full' "
                 "ORDER BY id DESC", (p["id"],),
@@ -536,7 +539,7 @@ def submit_session(sid: int):
             "accuracy": round(correct / graded, 4) if graded else None,
             "per_section": {SECTION_CN.get(k, k): v for k, v in per_section.items()},
             "detail": detail,
-            "note": "正确率为客观题正确数/已作答且有标准答案的题数，非六级考试成绩。",
+            "note": "正确率为客观题正确数/已作答且有标准答案的题数，非四六级考试成绩。",
         }
         conn.execute(
             "UPDATE sessions SET submitted_at=datetime('now','localtime'), result_json=? WHERE id=?",
@@ -745,7 +748,7 @@ def favorites_list():
 
 # ================================================================ 导入报告
 @app.get("/api/report")
-def import_report():
+def import_report(exam: Literal["cet4", "cet6"] | None = None):
     report_path = PROJECT / "data" / "import-report.json"
     if not report_path.exists():
         raise HTTPException(404, "尚未生成导入报告")
@@ -775,6 +778,15 @@ def import_report():
             "SELECT COUNT(*) c FROM section_materials WHERE section='translation' "
             "AND content_json LIKE '%reference_translation%'"
         ).fetchone()
+        if exam:
+            keys = {r[0] for r in conn.execute("SELECT paper_key FROM papers WHERE exam_type=?", (exam,))}
+            issues = [r for r in issues if r["paper_key"] in keys]
+            data["papers"] = [r for r in data.get("papers", []) if r["paper_key"] in keys]
+            stats = conn.execute("SELECT COUNT(DISTINCT q.paper_key) papers, COUNT(*) questions, SUM(q.answer IS NOT NULL) answers FROM questions q JOIN papers p ON q.paper_id=p.id WHERE p.exam_type=?", (exam,)).fetchone()
+            obj = conn.execute("SELECT COUNT(*) n, SUM(q.answer IS NOT NULL) a FROM questions q JOIN papers p ON q.paper_id=p.id WHERE p.exam_type=? AND q.qtype IN ('mcq','blank','match')", (exam,)).fetchone()
+            subj = conn.execute("SELECT COUNT(*) n FROM questions q JOIN papers p ON q.paper_id=p.id WHERE p.exam_type=? AND q.qtype IN ('essay','translation')", (exam,)).fetchone()
+            essays = conn.execute("SELECT COUNT(*) c FROM section_materials s JOIN papers p ON s.paper_id=p.id WHERE p.exam_type=? AND s.section='writing' AND s.content_json LIKE '%model_essay%'", (exam,)).fetchone()
+            trans = conn.execute("SELECT COUNT(*) c FROM section_materials s JOIN papers p ON s.paper_id=p.id WHERE p.exam_type=? AND s.section='translation' AND s.content_json LIKE '%reference_translation%'", (exam,)).fetchone()
         return {
             "summary": {
                 "papers": stats["papers"], "questions": stats["questions"],
@@ -1204,11 +1216,7 @@ def audio_file(paper_key: str, request: Request):
 def pdf_file(path: str = Query(...)):
     p = _safe_source_path(path)
     if p.suffix.lower() != ".pdf" or not p.is_file():
-        return HTMLResponse("""<!doctype html><meta charset="utf-8"><title>可选原卷资源</title>
-<main style="max-width:620px;margin:60px auto;padding:24px;font:18px/1.8 system-ui">
-<h1>尚未安装这份原 PDF</h1><p>正常刷题、答案解析和听力不受影响。</p>
-<p>如需对照原卷，请下载同版本的可选 PDF 资源包，解压后将 resources 文件夹合并到程序目录，再重新打开此链接。</p>
-<p>关闭本页即可返回练习。</p></main>""", status_code=404)
+        return HTMLResponse('<!doctype html><meta charset="utf-8"><title>可选原卷资源</title><main style="max-width:620px;margin:60px auto;padding:24px;font:18px/1.8 system-ui"><h1>尚未安装这份原 PDF</h1><p>正常刷题、答案解析、句子精讲和听力不受影响。</p><p>下载同版本 Optional-PDF 补充包，将 resources 合并到程序目录即可。</p></main>', status_code=404)
     return FileResponse(p, media_type="application/pdf", filename=p.name)
 
 
@@ -1220,8 +1228,7 @@ def startup():
 
 @app.get("/api/health")
 def local_health():
-    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.0.0"}
-
+    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.1.0"}
 
 @app.post("/api/local/shutdown")
 def local_shutdown(request: Request):
@@ -1229,10 +1236,8 @@ def local_shutdown(request: Request):
     if not token or not hmac.compare_digest(request.headers.get("X-CET6-Instance", ""), token):
         raise HTTPException(403, "仅允许本机启动器停止此实例")
     server = getattr(app.state, "local_server", None)
-    if server is None:
-        raise HTTPException(503, "此服务不是由便携启动器启动")
+    if server is None: raise HTTPException(503, "未由便携启动器启动")
     return JSONResponse({"stopping": True}, background=BackgroundTask(setattr, server, "should_exit", True))
-
 
 if FRONTEND_DIST.exists():
     app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="static")

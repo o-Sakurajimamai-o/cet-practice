@@ -13,7 +13,7 @@ def build():
         subprocess.run(['npm.cmd','run','build'],cwd=PROJECT/'frontend',check=True)
     if not (PROJECT/'seed/cet6.db').is_file(): raise RuntimeError('Provide the clean seed database first.')
     command=[sys.executable,'-m','PyInstaller','--noconfirm','--onedir','--console',
-       '--name','CET6-Practice','--distpath',str(PROJECT/'dist'),'--workpath',str(PROJECT/'build'),
+       '--name','CET-Practice','--distpath',str(PROJECT/'dist'),'--workpath',str(PROJECT/'build'),
        '--specpath',str(PROJECT/'packaging'),'--paths',str(PROJECT/'backend'),
        '--add-data',f'{PROJECT / "frontend/dist"}:frontend/dist',
        '--add-data',f'{PROJECT / "seed"}:seed',
@@ -23,7 +23,7 @@ def build():
        '--exclude-module','pymupdf','--exclude-module','fitz','--exclude-module','numpy',
        str(PROJECT/'packaging/launcher.py')]
     subprocess.run(command,cwd=PROJECT,check=True)
-    target=PROJECT/'dist/CET6-Practice'
+    target=PROJECT/'dist/CET-Practice'
     for name in ['Start.bat','Stop.bat','settings.json','README.md','THIRD_PARTY_NOTICES.md','LICENSE-NOTICE.md']:
         if (PROJECT/name).is_file(): shutil.copy2(PROJECT/name,target/name)
     shutil.copytree(PROJECT/'third_party_licenses',target/'third_party_licenses',dirs_exist_ok=True)

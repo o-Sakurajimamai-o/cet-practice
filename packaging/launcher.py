@@ -28,7 +28,7 @@ def local_request(record, path='/api/health', stop=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='CET6 portable practice')
+    parser = argparse.ArgumentParser(description='CET portable practice')
     parser.add_argument('--stop', action='store_true', help='Gracefully stop this folder\'s instance')
     parser.add_argument('--no-browser', action='store_true')
     parser.add_argument('--port', type=int, default=8765)
@@ -82,6 +82,7 @@ def main():
         if not resources.is_absolute(): resources = home / resources
         os.environ['CET6_PROJECT_DIR'] = str(home)
         os.environ['CET6_RESOURCE_ROOT'] = str(resources.resolve())
+        os.environ['CET_RESOURCE_ROOT'] = str(resources.resolve())
         os.environ['CET6_FRONTEND_DIST'] = str(bundle / 'frontend/dist')
         os.environ['CET6_DB_PATH'] = str(database)
         instance_id, token = secrets.token_hex(16), secrets.token_hex(32)
@@ -103,7 +104,7 @@ def main():
         record = {'pid': os.getpid(), 'port': port, 'instance_id': instance_id, 'token': token}
         tmp = record_path.with_suffix('.tmp')
         tmp.write_text(json.dumps(record), encoding='utf-8'); tmp.replace(record_path)
-        print(f'CET6 Practice: http://127.0.0.1:{port}/')
+        print(f'CET Practice: http://127.0.0.1:{port}/')
         print('Keep this window open. Use Stop.bat or Ctrl+C to stop normally.')
         print('Personal progress is stored in the data folder beside the EXE.')
         def open_when_ready():
@@ -131,6 +132,6 @@ if __name__ == '__main__':
         if stream and hasattr(stream, 'reconfigure'): stream.reconfigure(encoding='utf-8', errors='replace')
     try: main()
     except Exception as exc:
-        logging.exception('Cannot start CET6 Practice')
+        logging.exception('Cannot start CET Practice')
         if sys.stdin and sys.stdin.isatty(): input('Press Enter to close...')
         sys.exit(1)
