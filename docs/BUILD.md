@@ -31,7 +31,7 @@ npm run build
 cd ..
 python tests/test_backend_regressions.py
 python packaging/build_macos.py --arch arm64  # Intel 主机改为 x86_64
-python -m pip install playwright==1.64.1
+python -m pip install playwright==1.56.0
 python -m playwright install webkit
 python tests/test_macos_package.py --arch arm64
 ```

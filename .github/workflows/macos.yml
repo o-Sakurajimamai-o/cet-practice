@@ -45,7 +45,7 @@ jobs:
         run: python packaging/build_macos.py --arch '${{ matrix.arch }}'
       - name: Install browser verification tools (not bundled)
         run: |
-          python -m pip install playwright==1.64.1
+          python -m pip install playwright==1.56.0
           python -m playwright install webkit
       - name: Verify extracted delivery ZIP on macOS
         timeout-minutes: 6
