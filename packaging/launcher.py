@@ -99,6 +99,7 @@ def main():
             except (OSError, ValueError, KeyError): time.sleep(.25)
         raise RuntimeError('Another instance is starting or stopping. Please wait and retry.')
 
+    native_quit_app = None
     try:
         database = data / 'cet6.db'
         if not database.exists():
@@ -153,7 +154,7 @@ def main():
         try:
             if sys.platform == 'darwin' and not args.no_browser:
                 from mac_menu import run_menu
-                run_menu(server, sock, port, user_root, settings_path, settings)
+                native_quit_app = run_menu(server, sock, port, user_root, settings_path, settings)
             else:
                 if not args.no_browser: threading.Thread(target=open_when_ready, daemon=True).start()
                 server.run(sockets=[sock])
@@ -165,6 +166,8 @@ def main():
             except (OSError, ValueError): pass
     finally:
         release_lock(lock)
+    if native_quit_app is not None:
+        native_quit_app.replyToApplicationShouldTerminate_(True)
 
 
 if __name__ == '__main__':

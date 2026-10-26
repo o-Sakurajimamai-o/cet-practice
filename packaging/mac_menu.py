@@ -1,12 +1,13 @@
 """Small native menu; the practice interface remains in the user's browser."""
 import json
+import signal
 import threading
-import webbrowser
 from pathlib import Path
 
 from AppKit import (NSApplication, NSApplicationActivationPolicyAccessory, NSMenu,
                     NSMenuItem, NSObject, NSOpenPanel, NSStatusBar, NSVariableStatusItemLength,
-                    NSWorkspace, NSTerminateCancel)
+                    NSWorkspace, NSTerminateLater, NSEvent, NSApplicationDefined)
+from Foundation import NSURL
 from PyObjCTools import AppHelper
 
 
@@ -15,10 +16,11 @@ def run_menu(server, sock, port, user_root, settings_path, settings):
     application.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
     url = f'http://127.0.0.1:{port}/'
     errors = []
+    pending_termination = False
 
     class PracticeMenu(NSObject):
         def openPractice_(self, sender):
-            webbrowser.open(url)
+            NSWorkspace.sharedWorkspace().openURL_(NSURL.URLWithString_(url))
 
         def openData_(self, sender):
             NSWorkspace.sharedWorkspace().openFile_(str(user_root))
@@ -48,8 +50,10 @@ def run_menu(server, sock, port, user_root, settings_path, settings):
             self.quit_item.setEnabled_(False)
 
         def applicationShouldTerminate_(self, sender):
+            nonlocal pending_termination
+            pending_termination = True
             self.quitPractice_(None)
-            return NSTerminateCancel  # Stop only after Uvicorn finishes pending requests.
+            return NSTerminateLater  # Reply only after server and database cleanup.
 
         def applicationShouldHandleReopen_hasVisibleWindows_(self, sender, visible):
             self.openPractice_(None)
@@ -81,21 +85,34 @@ def run_menu(server, sock, port, user_root, settings_path, settings):
     def poll():
         nonlocal opened
         if not worker.is_alive():
-            AppHelper.stopEventLoop()
+            # AppHelper.stopEventLoop sends terminate:, which would re-enter our
+            # asynchronous quit delegate. Stop NSApplication.run directly instead.
+            application.stop_(None)
+            event = NSEvent.otherEventWithType_location_modifierFlags_timestamp_windowNumber_context_subtype_data1_data2_(
+                NSApplicationDefined, (0, 0), 0, 0, 0, None, 0, 0, 0)
+            application.postEvent_atStart_(event, True)
             return
         if server.started and not opened:
             opened = True
-            webbrowser.open(url)
+            controller.openPractice_(None)
         AppHelper.callLater(.2, poll)
 
     AppHelper.callLater(.2, poll)
+    old_handlers = {number: signal.getsignal(number) for number in (signal.SIGINT, signal.SIGTERM)}
+    def request_quit(number, frame):
+        server.should_exit = True
+    for number in old_handlers:
+        signal.signal(number, request_quit)
     try:
-        AppHelper.runEventLoop(installInterrupt=True)
+        application.run()
     finally:
         server.should_exit = True
         worker.join(timeout=20)
         NSStatusBar.systemStatusBar().removeStatusItem_(status)
+        for number, handler in old_handlers.items():
+            signal.signal(number, handler)
     if worker.is_alive():
         raise RuntimeError('Local server did not stop in time.')
     if errors:
         raise errors[0]
+    return application if pending_termination else None

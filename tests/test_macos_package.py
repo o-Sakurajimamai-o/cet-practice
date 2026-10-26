@@ -6,6 +6,7 @@ import os
 import platform
 import plistlib
 import shutil
+import signal
 import socket
 import sqlite3
 import subprocess
@@ -23,6 +24,8 @@ opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 def check(label, value):
     assert value, label
     checks.append(label)
+    if len(checks) < 16 or len(checks) % 10 == 0 or not label.startswith('audio range '):
+        print('PASS: ' + label, flush=True)
 
 
 def request(port, path, method='GET', body=None, headers=None):
@@ -50,7 +53,7 @@ def run(archive, arch):
     with tempfile.TemporaryDirectory(prefix='四六级 Mac 发布验证 ') as tmp:
         root = Path(tmp)
         unpack = root / '含中文 and spaces'
-        subprocess.run(['ditto', '-x', '-k', str(archive.resolve()), str(unpack)], check=True)
+        subprocess.run(['ditto', '-x', '-k', str(archive.resolve()), str(unpack)], check=True, timeout=120)
         app = unpack / 'CET-Practice-macOS/CET-Practice.app'
         binary = app / 'Contents/MacOS/CET-Practice'
         user = root / '用户数据 and settings'
@@ -192,6 +195,8 @@ def run(archive, arch):
             result = {'passed': False, 'checks': checks, 'error': str(error)}
             raise
         finally:
+            if (user / 'launcher.log').exists():
+                shutil.copy2(user / 'launcher.log', project / f'release-assets/launcher-macOS-{arch}.log')
             for process in processes:
                 if process.poll() is None:
                     process.terminate()
@@ -207,5 +212,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--arch', required=True)
     args = parser.parse_args()
+    def deadline(number, frame):
+        raise TimeoutError('macOS package verification exceeded five minutes')
+    signal.signal(signal.SIGALRM, deadline)
+    signal.alarm(300)
     archive = Path(__file__).resolve().parents[1] / f'release-assets/CET-Practice-v1.1.1-macOS-{args.arch}.zip'
     run(archive, args.arch)
