@@ -93,23 +93,45 @@ jobs:
           PY
       - name: Create draft and upload verified assets
         run: |
-          gh release create v1.1.1 --draft --target "$SOURCE_SHA" --title '四六级研习室 v1.1.1 · macOS Apple 芯片 / Intel' --notes-file release/release-notes.md
-          gh release upload v1.1.1 release/*.zip release/SHA256SUMS.txt
+          python3 - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          base='repos/'+os.environ['GH_REPO']
+          def api(path):
+              return json.loads(subprocess.check_output(['gh','api',path]))
+          release=next((r for r in api(base+'/releases') if r['tag_name']=='v1.1.1'),None)
+          if release is None:
+              subprocess.run(['gh','release','create','v1.1.1','--draft','--target',os.environ['SOURCE_SHA'],'--title','四六级研习室 v1.1.1 · macOS Apple 芯片 / Intel','--notes-file','release/release-notes.md'],check=True)
+              release=next(r for r in api(base+'/releases') if r['tag_name']=='v1.1.1')
+          assert release['draft'] and release['target_commitish']==os.environ['SOURCE_SHA']
+          Path('/tmp/release-id').write_text(str(release['id']))
+          for path in [*Path('release').glob('*.zip'),Path('release/SHA256SUMS.txt')]:
+              digest='sha256:'+hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
+              asset=next((a for a in release['assets'] if a['name']==path.name),None)
+              if asset and asset['size']==path.stat().st_size and asset['digest']==digest:
+                  print('Verified existing draft asset: '+path.name,flush=True)
+                  continue
+              if asset:
+                  subprocess.run(['gh','api','--method','DELETE',base+'/releases/assets/'+str(asset['id'])],check=True)
+              subprocess.run(['gh','release','upload','v1.1.1',str(path)],check=True)
+          PY
       - name: Verify GitHub stored hashes before publication
         run: |
-          gh api repos/{owner}/{repo}/releases/tags/v1.1.1 > /tmp/draft.json
           python3 - <<'PY'
-          import hashlib,json
+          import hashlib,json,os,subprocess
           from pathlib import Path
-          release=json.load(open('/tmp/draft.json'))
+          path='repos/'+os.environ['GH_REPO']+'/releases/'+Path('/tmp/release-id').read_text()
+          release=json.loads(subprocess.check_output(['gh','api',path]))
           assert release['draft']
           for path in [*Path('release').glob('*.zip'),Path('release/SHA256SUMS.txt')]:
               asset=next(a for a in release['assets'] if a['name']==path.name)
               assert asset['size']==path.stat().st_size
               assert asset['digest']=='sha256:'+hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
+          endpoint='repos/'+os.environ['GH_REPO']+'/releases/'+Path('/tmp/release-id').read_text()
+          subprocess.run(['gh','api','--method','PATCH',endpoint,'-F','draft=false','-f','make_latest=true'],check=True,stdout=subprocess.DEVNULL)
           PY
-          gh release edit v1.1.1 --draft=false --latest
       - name: Save publication evidence
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macOS-publication-evidence
