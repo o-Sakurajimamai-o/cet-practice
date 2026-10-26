@@ -29,3 +29,5 @@ This release bundles a Python runtime, selected Python server libraries, and a c
 | uvicorn | 0.54.0 | BSD-3-Clause |
 
 Frontend runtime packages: React/React DOM 18.3.1, React Router 6.x and Scheduler, under their bundled MIT notices. See the checked-in package-lock.json for exact resolved versions. PDF importer dependencies are separate and are not shipped in the executable.
+
+macOS packages additionally bundle pyobjc-core 12.2.2 and pyobjc-framework-Cocoa 12.2.2 (MIT), for the native menu bar. Their license files and the resolved macOS build environment are included inside the application bundle. The application uses system AppKit/Foundation frameworks provided by macOS.

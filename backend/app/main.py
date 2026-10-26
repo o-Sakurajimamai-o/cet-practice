@@ -27,6 +27,7 @@ from . import db
 
 PROJECT = Path(os.environ.get("CET6_PROJECT_DIR", Path(__file__).resolve().parents[2]))
 ROOT = Path(os.environ.get("CET_RESOURCE_ROOT", os.environ.get("CET6_RESOURCE_ROOT", PROJECT / "resources")))
+PDF_ROOT = Path(os.environ["CET_PDF_RESOURCE_ROOT"]) if os.environ.get("CET_PDF_RESOURCE_ROOT") else None
 FRONTEND_DIST = Path(os.environ.get("CET6_FRONTEND_DIST", PROJECT / "frontend" / "dist"))
 
 app = FastAPI(title="四六级研习室", docs_url=None, redoc_url=None)
@@ -1180,16 +1181,17 @@ def backup_import(body: BackupImport, merge: bool = Query(True)):
 
 
 # ================================================================ 媒体（音频 / 原PDF）
-def _safe_source_path(rel_path: str) -> Path:
+def _safe_source_path(rel_path: str, root: Path | None = None) -> Path:
     """只允许访问题库根目录内的文件，防目录穿越。"""
+    root = ROOT if root is None else root
     rel_path = rel_path.replace("\\", "/")
     if ".." in rel_path.split("/") or rel_path.startswith("/") or PureWindowsPath(rel_path).drive or "\x00" in rel_path:
         raise HTTPException(403, "非法路径")
     try:
-        p = (ROOT / rel_path).resolve()
+        p = (root / rel_path).resolve()
     except (OSError, ValueError) as exc:
         raise HTTPException(403, "非法路径") from exc
-    if not p.is_relative_to(ROOT.resolve()):
+    if not p.is_relative_to(root.resolve()):
         raise HTTPException(403, "非法路径")
     return p
 
@@ -1214,9 +1216,9 @@ def audio_file(paper_key: str, request: Request):
 
 @app.get("/api/pdf")
 def pdf_file(path: str = Query(...)):
-    p = _safe_source_path(path)
+    p = _safe_source_path(path, PDF_ROOT)
     if p.suffix.lower() != ".pdf" or not p.is_file():
-        return HTMLResponse('<!doctype html><meta charset="utf-8"><title>可选原卷资源</title><main style="max-width:620px;margin:60px auto;padding:24px;font:18px/1.8 system-ui"><h1>尚未安装这份原 PDF</h1><p>正常刷题、答案解析、句子精讲和听力不受影响。</p><p>下载同版本 Optional-PDF 补充包，将 resources 合并到程序目录即可。</p></main>', status_code=404)
+        return HTMLResponse('<!doctype html><meta charset="utf-8"><title>可选原卷资源</title><main style="max-width:620px;margin:60px auto;padding:24px;font:18px/1.8 system-ui"><h1>尚未安装这份原 PDF</h1><p>正常刷题、答案解析、句子精讲和听力不受影响。</p><p>下载 Optional-PDF 补充包：Windows 将 resources 合并到程序目录；macOS 在菜单栏「四六级 → 选择原 PDF 文件夹」中选择解压后的文件夹。</p></main>', status_code=404)
     return FileResponse(p, media_type="application/pdf", filename=p.name)
 
 
@@ -1228,7 +1230,7 @@ def startup():
 
 @app.get("/api/health")
 def local_health():
-    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.1.0"}
+    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.1.1"}
 
 @app.post("/api/local/shutdown")
 def local_shutdown(request: Request):

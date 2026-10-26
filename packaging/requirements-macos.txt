@@ -1,0 +1,3 @@
+-r requirements-build.txt
+pyobjc-core==12.2.2
+pyobjc-framework-Cocoa==12.2.2

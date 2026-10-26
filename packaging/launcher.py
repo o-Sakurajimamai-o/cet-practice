@@ -1,4 +1,4 @@
-"""Portable launcher. User data stays beside the EXE, outside the runtime bundle."""
+"""Local launcher: portable Windows data, persistent macOS Application Support data."""
 import argparse
 import contextlib
 import json
@@ -14,6 +14,41 @@ import time
 import urllib.error
 import urllib.request
 import webbrowser
+
+
+def runtime_paths():
+    frozen = getattr(sys, 'frozen', False)
+    home = Path(sys.executable).resolve().parent if frozen else Path(__file__).resolve().parents[1]
+    bundle = Path(getattr(sys, '_MEIPASS', home))
+    if sys.platform == 'darwin':
+        user_root = Path.home() / 'Library/Application Support/CET-Practice'
+        if frozen:
+            home = bundle  # Read bundled resources; never write inside a signed .app.
+    else:
+        user_root = home
+    user_root = Path(os.environ.get('CET_PRACTICE_USER_DIR', user_root)).expanduser().resolve()
+    return home, bundle, user_root
+
+
+def acquire_lock(lock):
+    if sys.platform == 'win32':
+        import msvcrt
+        lock.seek(0); lock.write(b'0'); lock.flush(); lock.seek(0)
+        msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def release_lock(lock):
+    if sys.platform == 'win32':
+        import msvcrt
+        lock.seek(0)
+        msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    lock.close()
 
 
 def local_request(record, path='/api/health', stop=False):
@@ -33,10 +68,11 @@ def main():
     parser.add_argument('--no-browser', action='store_true')
     parser.add_argument('--port', type=int, default=8765)
     args = parser.parse_args()
-    home = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parents[1]
-    bundle = Path(getattr(sys, '_MEIPASS', home))
-    data = home / 'data'
-    data.mkdir(exist_ok=True)
+    home, bundle, user_root = runtime_paths()
+    data = user_root / 'data'
+    data.mkdir(parents=True, exist_ok=True)
+    if sys.platform == 'darwin':
+        logging.basicConfig(filename=user_root / 'launcher.log', encoding='utf-8', level=logging.INFO)
     record_path = data / 'server.json'
     if args.stop:
         if not record_path.is_file():
@@ -48,12 +84,10 @@ def main():
         local_request(record, '/api/local/shutdown', stop=True)
         print('Shutdown requested. Your saved answers are retained.'); return
 
-    # A folder-specific OS file lock prevents two processes sharing this database.
-    import msvcrt
+    # OS locks are released even after a crash; two copies cannot share this database.
     lock = (data / 'instance.lock').open('a+b')
-    lock.seek(0); lock.write(b'0'); lock.flush(); lock.seek(0)
     try:
-        msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+        acquire_lock(lock)
     except OSError:
         lock.close()
         for _ in range(20):
@@ -76,13 +110,15 @@ def main():
             temporary.replace(database)
         report = data / 'import-report.json'
         if not report.exists(): shutil.copy2(bundle / 'seed/import-report.json', report)
-        settings_path = home / 'settings.json'
+        settings_path = user_root / 'settings.json'
         settings = json.loads(settings_path.read_text(encoding='utf-8-sig')) if settings_path.exists() else {}
         resources = Path(settings.get('resource_directory', 'resources'))
         if not resources.is_absolute(): resources = home / resources
         os.environ['CET6_PROJECT_DIR'] = str(home)
         os.environ['CET6_RESOURCE_ROOT'] = str(resources.resolve())
         os.environ['CET_RESOURCE_ROOT'] = str(resources.resolve())
+        if settings.get('pdf_resource_directory'):
+            os.environ['CET_PDF_RESOURCE_ROOT'] = str(Path(settings['pdf_resource_directory']).expanduser().resolve())
         os.environ['CET6_FRONTEND_DIST'] = str(bundle / 'frontend/dist')
         os.environ['CET6_DB_PATH'] = str(database)
         instance_id, token = secrets.token_hex(16), secrets.token_hex(32)
@@ -98,6 +134,7 @@ def main():
         port = sock.getsockname()[1]
         server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=port,
             loop='asyncio', http='h11', ws='none', lifespan='on', access_log=False,
+            log_config=None if sys.platform == 'darwin' else uvicorn.config.LOGGING_CONFIG,
             timeout_graceful_shutdown=10))
         app.state.instance_id = instance_id
         app.state.local_server = server
@@ -105,16 +142,21 @@ def main():
         tmp = record_path.with_suffix('.tmp')
         tmp.write_text(json.dumps(record), encoding='utf-8'); tmp.replace(record_path)
         print(f'CET Practice: http://127.0.0.1:{port}/')
-        print('Keep this window open. Use Stop.bat or Ctrl+C to stop normally.')
-        print('Personal progress is stored in the data folder beside the EXE.')
+        print('Use the menu bar Quit command on macOS, or Stop.bat / Ctrl+C on Windows.')
+        print(f'Personal progress: {data}')
         def open_when_ready():
             for _ in range(100):
                 if server.started:
                     webbrowser.open(f'http://127.0.0.1:{port}/'); return
                 if server.should_exit: return
                 time.sleep(.1)
-        if not args.no_browser: threading.Thread(target=open_when_ready, daemon=True).start()
-        try: server.run(sockets=[sock])
+        try:
+            if sys.platform == 'darwin' and not args.no_browser:
+                from mac_menu import run_menu
+                run_menu(server, sock, port, user_root, settings_path, settings)
+            else:
+                if not args.no_browser: threading.Thread(target=open_when_ready, daemon=True).start()
+                server.run(sockets=[sock])
         finally:
             sock.close()
             try:
@@ -122,9 +164,7 @@ def main():
                     record_path.unlink()
             except (OSError, ValueError): pass
     finally:
-        lock.seek(0)
-        msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
-        lock.close()
+        release_lock(lock)
 
 
 if __name__ == '__main__':
@@ -133,5 +173,14 @@ if __name__ == '__main__':
     try: main()
     except Exception as exc:
         logging.exception('Cannot start CET Practice')
+        if sys.platform == 'darwin' and getattr(sys, 'frozen', False) and '--no-browser' not in sys.argv:
+            try:
+                from AppKit import NSAlert
+                alert = NSAlert.alloc().init()
+                alert.setMessageText_('四六级研习室未能启动')
+                alert.setInformativeText_(str(exc))
+                alert.runModal()
+            except Exception:
+                pass
         if sys.stdin and sys.stdin.isatty(): input('Press Enter to close...')
         sys.exit(1)
