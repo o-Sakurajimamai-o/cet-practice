@@ -1,0 +1,122 @@
+name: Publish verified macOS v1.1.1
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful macOS build workflow run ID
+        required: true
+      source_sha:
+        description: Exact tested source commit
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ inputs.run_id }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+    steps:
+      - name: Validate tested source and workflow
+        run: |
+          python3 - <<'PY'
+          import os,re
+          assert re.fullmatch(r'[0-9]+',os.environ['RUN_ID'])
+          assert re.fullmatch(r'[0-9a-f]{40}',os.environ['SOURCE_SHA'])
+          PY
+          gh run view "$RUN_ID" --json conclusion,headSha > /tmp/tested-run.json
+          python3 - <<'PY'
+          import json,os
+          run=json.load(open('/tmp/tested-run.json'))
+          assert run['conclusion']=='success'
+          assert run['headSha']==os.environ['SOURCE_SHA']
+          PY
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Retrieve verified build artifacts
+        run: |
+          gh run download "$RUN_ID" -n macOS-arm64 -D assets/arm64
+          gh run download "$RUN_ID" -n macOS-x86_64 -D assets/x86_64
+      - name: Prepare source archive
+        run: |
+          mkdir release
+          git archive --format=zip --prefix=cet-practice/ -o release/CET-Practice-v1.1.1-Source.zip "$SOURCE_SHA"
+      - name: Verify packages and prepare publication
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,shutil
+          from pathlib import Path
+          out=Path('release'); reports={}; manifest=[]
+          for arch in ['arm64','x86_64']:
+              directory=Path('assets')/arch
+              report=json.loads((directory/f'verification-macOS-{arch}.json').read_text())
+              build=json.loads((directory/f'build-macOS-{arch}.json').read_text())
+              assert report['passed'] and report['architecture']==arch and len(report['checks'])>=125
+              package=directory/f'CET-Practice-v1.1.1-macOS-{arch}.zip'
+              assert hashlib.file_digest(package.open('rb'),'sha256').hexdigest()==build['sha256']
+              assert package.stat().st_size==build['bytes']<2*1024**3
+              shutil.copy2(package,out/package.name)
+              for name in [f'verification-macOS-{arch}.json',f'build-macOS-{arch}.json',f'browser-macOS-{arch}.png']:
+                  shutil.copy2(directory/name,out/name)
+              reports[arch]=len(report['checks'])
+          for package in sorted(out.glob('*.zip')):
+              manifest.append({'name':package.name,'bytes':package.stat().st_size,'sha256':hashlib.file_digest(package.open('rb'),'sha256').hexdigest()})
+          (out/'SHA256SUMS.txt').write_text(''.join(f"{a['sha256']}  {a['name']}\n" for a in manifest))
+          (out/'manifest.json').write_text(json.dumps({'source_commit':os.environ['SOURCE_SHA'],'build_run_id':os.environ['RUN_ID'],'assets':manifest},indent=2))
+          notes=f'''新增 macOS 版，题库与听力沿用 v1.1.0，无需安装 Python 或 Node.js。
+
+          - **Apple 芯片（M 系列）**：下载 `CET-Practice-v1.1.1-macOS-arm64.zip`。
+          - **Intel 芯片**：下载 `CET-Practice-v1.1.1-macOS-x86_64.zip`。
+          - **Windows 用户**：继续使用 [v1.1.0 Windows 便携版](https://github.com/o-Sakurajimamai-o/cet-practice/releases/tag/v1.1.0)。
+
+          支持 macOS 14+。完整解压后将 `.app` 拖到「应用程序」打开。菜单栏「四六级」可打开网页、选择 PDF 文件夹或退出。记录保存在 `~/Library/Application Support/CET-Practice/data`，升级替换应用时保留。
+
+          本版采用 ad-hoc 签名，尚未经过 Apple 开发者签名和公证。首次被系统拦截时，确认下载自本项目，再到「系统设置 → 隐私与安全性 → 仍要打开」。详见 [Mac 使用说明](https://github.com/o-Sakurajimamai-o/cet-practice/blob/v1.1.1/docs/MACOS.md)。
+
+          含四级 46 套、六级 76 套，共 6,089 题与 76 份独立听力。原 PDF 可沿用 [v1.1.0 Optional-PDF 补充包](https://github.com/o-Sakurajimamai-o/cet-practice/releases/tag/v1.1.0)，日常刷题无需下载。
+
+          两种架构均在 GitHub 托管 macOS 主机上完成实际程序验证（Apple 芯片 {reports['arm64']} 项、Intel {reports['x86_64']} 项），涵盖 WebKit 页面、M4A 播放和拖动、中文路径、保存重启、原 PDF、原生菜单启动与正常退出；另有 20 项后端回归通过。未在群友的实体 Mac 上验收。
+
+          感谢 [Linux Do 社区](https://linux.do/)。
+          '''
+          notes='\n'.join(line[10:] if line.startswith(' '*10) else line for line in notes.splitlines())
+          notes+='\n\n附件大小：\n'+''.join(f"- {a['name']}：{a['bytes']/1024**2:.2f} MiB\n" for a in manifest)
+          (out/'release-notes.md').write_text(notes)
+          PY
+      - name: Create draft and upload verified assets
+        run: |
+          gh release create v1.1.1 --draft --target "$SOURCE_SHA" --title '四六级研习室 v1.1.1 · macOS Apple 芯片 / Intel' --notes-file release/release-notes.md
+          gh release upload v1.1.1 release/*.zip release/SHA256SUMS.txt
+      - name: Verify GitHub stored hashes before publication
+        run: |
+          gh api repos/{owner}/{repo}/releases/tags/v1.1.1 > /tmp/draft.json
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          release=json.load(open('/tmp/draft.json'))
+          assert release['draft']
+          for path in [*Path('release').glob('*.zip'),Path('release/SHA256SUMS.txt')]:
+              asset=next(a for a in release['assets'] if a['name']==path.name)
+              assert asset['size']==path.stat().st_size
+              assert asset['digest']=='sha256:'+hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
+          PY
+          gh release edit v1.1.1 --draft=false --latest
+      - name: Save publication evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macOS-publication-evidence
+          path: |
+            release/*.json
+            release/*.txt
+            release/*.md
+            release/*.png
+          retention-days: 30
+          if-no-files-found: error
