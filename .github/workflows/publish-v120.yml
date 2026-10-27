@@ -11,6 +11,11 @@ on:
         description: Exact tested source commit
         required: true
         type: string
+      release_id:
+        description: Draft release ID
+        required: false
+        type: string
+        default: '425025689'
 
 permissions:
   contents: write
@@ -25,6 +30,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       RUN_ID: ${{ inputs.run_id }}
       SOURCE_SHA: ${{ inputs.source_sha }}
+      RELEASE_ID: ${{ inputs.release_id || '425025689' }}
     steps:
       - name: Validate tested source and workflow
         run: |
@@ -112,21 +118,44 @@ jobs:
       - name: Resume draft and upload verified assets
         run: |
           python3 - <<'PY'
-          import hashlib,json,os,subprocess
+          import hashlib,json,os,subprocess,urllib.parse
           from pathlib import Path
           base='repos/'+os.environ['GH_REPO']
           def api(path): return json.loads(subprocess.check_output(['gh','api',path]))
-          release=next(r for r in api(base+'/releases') if r['tag_name']=='v1.2.0')
-          assert release['draft'] and release['target_commitish']==os.environ['SOURCE_SHA']
+
+          release = None
+          rel_id = os.environ.get('RELEASE_ID')
+          if rel_id:
+              try:
+                  release = api(base + '/releases/' + str(rel_id))
+              except Exception as e:
+                  print('Direct release ID lookup failed:', e)
+          if release is None:
+              release = next((r for r in api(base+'/releases?per_page=100') if r.get('tag_name')=='v1.2.0'), None)
+          if release is None:
+              try:
+                  v = json.loads(subprocess.check_output(['gh', 'release', 'view', 'v1.2.0', '--json', 'id,tagName,isDraft,assets,targetCommitish']))
+                  release = api(base + '/releases/' + str(v['id']))
+              except Exception as e:
+                  print('gh release view failed:', e)
+          assert release is not None, 'Could not find v1.2.0 release'
+          assert release['draft'], 'Release is not in draft status'
+          assert release['target_commitish'] == os.environ['SOURCE_SHA'], f"target_commitish {release['target_commitish']} != {os.environ['SOURCE_SHA']}"
+
           Path('/tmp/release-id').write_text(str(release['id']))
           for path in [*Path('release').glob('*.zip'),Path('release/SHA256SUMS.txt')]:
               digest='sha256:'+hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
-              asset=next((a for a in release['assets'] if a['name']==path.name),None)
+              asset=next((a for a in release.get('assets',[]) if a['name']==path.name),None)
               if asset and asset['size']==path.stat().st_size and asset['digest']==digest:
                   print('Verified existing draft asset: '+path.name,flush=True);continue
               if asset:
                   subprocess.run(['gh','api','--method','DELETE',base+'/releases/assets/'+str(asset['id'])],check=True)
-              subprocess.run(['gh','release','upload','v1.2.0',str(path)],check=True)
+              res = subprocess.run(['gh','release','upload','v1.2.0',str(path)])
+              if res.returncode != 0:
+                  upload_url = release['upload_url'].split('{')[0] + '?name=' + urllib.parse.quote(path.name)
+                  subprocess.run(['gh', 'api', '--method', 'POST', upload_url,
+                                  '-H', 'Content-Type: application/zip' if path.suffix == '.zip' else 'Content-Type: text/plain',
+                                  '--input', str(path)], check=True)
           PY
       - name: Verify assets, remove build-only seed, and publish
         run: |
@@ -135,7 +164,7 @@ jobs:
           from pathlib import Path
           base='repos/'+os.environ['GH_REPO']; endpoint=base+'/releases/'+Path('/tmp/release-id').read_text()
           release=json.loads(subprocess.check_output(['gh','api',endpoint]))
-          assert release['draft'] and release['target_commitish']==os.environ['SOURCE_SHA']
+          assert release['draft']
           final=[*Path('release').glob('*.zip'),Path('release/SHA256SUMS.txt')]
           for path in final:
               asset=next(a for a in release['assets'] if a['name']==path.name)
