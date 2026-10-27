@@ -39,7 +39,7 @@ def download_asset_via_api(repo, asset_id, token, dest):
 
 
 def get_asset_via_api(repo, token):
-    url = f'https://api.github.com/repos/{repo}/releases'
+    url = f'https://api.github.com/repos/{repo}/releases?per_page=50'
     req = urllib.request.Request(url, headers={
         'Authorization': f'Bearer {token}',
         'Accept': 'application/vnd.github+json',
@@ -48,12 +48,14 @@ def get_asset_via_api(repo, token):
     with urllib.request.urlopen(req, timeout=30) as resp:
         releases = json.load(resp)
     for r in releases:
-        if r.get('tag_name') == 'v1.2.0':
+        tag = r.get('tag_name', '')
+        rel_name = r.get('name', '')
+        if tag == 'v1.2.0' or 'v1.2.0' in tag or 'v1.2.0' in rel_name:
             for asset in r.get('assets', []):
                 for name in ['CET-Practice-v1.2.0-clean-build-seed.zip', 'CET-Practice-v1.2.0-Windows-x64.zip']:
                     if asset['name'] == name:
                         dest = target / name
-                        print(f"Downloading {name} (asset ID {asset['id']}) via GitHub API...", flush=True)
+                        print(f"Downloading {name} (asset ID {asset['id']}) from release {r.get('id')}...", flush=True)
                         download_asset_via_api(repo, asset['id'], token, dest)
                         return True
     return False
