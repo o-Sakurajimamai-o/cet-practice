@@ -29,6 +29,14 @@ export default function QuestionCard({
   const [favoriteError, setFavoriteError] = useState('')
   const [loadedDetail, setLoadedDetail] = useState<any | null>(null)
   const q = { ...loadedDetail, ...baseQuestion }
+  const markBase = 1000 + (Number(q.q_no) || 0) * 100
+  const choose = (key: string, keyboard = false) => {
+    if (submitted || saving || (!keyboard && !window.getSelection()?.isCollapsed)) return
+    onAnswer(key)
+  }
+  const chooseKey = (event: React.KeyboardEvent, key: string) => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(key, true) }
+  }
   const [note, setNote] = useState(analysisData?.note || '')
   const [noteSaved, setNoteSaved] = useState('')
   const [remoteNote, setRemoteNote] = useState<string | null>(null)
@@ -62,6 +70,9 @@ export default function QuestionCard({
 
   const verdict = detail?.verdict
   const canShowAnalysis = showAnalysis
+  // A submitted attempt retains the answer used when it was graded, even if
+  // the question is corrected later. Do not reveal answers during practice.
+  const displayAnswer = submitted ? detail?.answer : canShowAnalysis ? q.answer : null
 
   async function toggleAnalysis() {
     if (showAnalysis) { void persistNote(); setShowAnalysis(false); return }
@@ -123,33 +134,38 @@ export default function QuestionCard({
       </div>
       {favoriteError && <div className="muted small" role="alert">{favoriteError}</div>}
 
+      {submitted && detail?.kind === 'objective' && <div className="review-answer">
+        <span>你的作答：<b>{detail.choice || '未作答'}</b></span>
+        <span>交卷时的答案：<b>{detail.answer || '无标准答案'}</b></span>
+      </div>}
+
       {q.qtype === 'mcq' && (
         <>
-          {q.stem && <div className="stem">{q.stem}</div>}
+          {q.stem && <div className="stem" data-mark-index={markBase}>{q.stem}</div>}
           <div className="opts">
-            {(q.options || []).map((o: any) => {
+            {(q.options || []).map((o: any, optionIndex: number) => {
               let cls = 'opt'
               const selected = answer === o.key
               if (selected) cls += ' selected'
-              if (canShowAnalysis && q.answer) {
-                if (o.key === q.answer) cls += ' correct'
+              if (displayAnswer) {
+                if (o.key === displayAnswer) cls += ' correct'
                 else if (selected) cls += ' wrong'
               }
               return (
-                <button key={o.key} className={cls}
-                  disabled={submitted || saving}
+                <div key={o.key} role="button" tabIndex={submitted || saving ? -1 : 0} className={cls}
+                  aria-disabled={submitted || saving}
                   aria-pressed={selected}
-                  onClick={() => onAnswer(o.key)}
+                  onClick={() => choose(o.key)} onKeyDown={e => chooseKey(e, o.key)}
                 >
                   <span className="okey">{o.key}</span>
-                  <span className="otext">{o.text}</span>
-                  {canShowAnalysis && q.answer && o.key === q.answer && (
+                  <span className="otext" data-mark-index={markBase + 1 + optionIndex}>{o.text}</span>
+                  {displayAnswer && o.key === displayAnswer && (
                     <span className="verdict"><Icon name="check" size={14}/>正确答案</span>
                   )}
-                  {canShowAnalysis && selected && q.answer && o.key !== q.answer && (
+                  {displayAnswer && selected && o.key !== displayAnswer && (
                     <span className="verdict"><Icon name="close" size={14}/>你的选择</span>
                   )}
-                </button>
+                </div>
               )
             })}
           </div>
@@ -161,31 +177,31 @@ export default function QuestionCard({
           {q.stem && (
             <div className="stem muted">
               {q.stem.split(/__\(\d+\)__/).map((s: string, i: number, arr: any[]) => (
-                <span key={i}>{s}{i < arr.length - 1 ? <b className="blank-ref">{answer ? `${q.q_no} · ${answer}` : q.q_no}</b> : null}</span>
+                <span key={i}><span data-mark-index={markBase + 40 + i}>{s}</span>{i < arr.length - 1 ? <b className="blank-ref">{answer ? `${q.q_no} · ${answer}` : q.q_no}</b> : null}</span>
               ))}
             </div>
           )}
-          <div className="letter-row">
-            {(q.options || []).map((o: any) => {
-              let cls = 'L'
+          <div className="word-options">
+            {(q.options || []).map((o: any, optionIndex: number) => {
+              let cls = 'word-option'
               if (answer === o.key) cls += ' selected'
               return (
-                <button key={o.key} className={cls}
-                  disabled={submitted || saving}
+                <div key={o.key} role="button" tabIndex={submitted || saving ? -1 : 0} className={cls}
+                  aria-disabled={submitted || saving}
                   aria-pressed={answer === o.key}
                   title={`${o.key}) ${o.text}`}
-                  onClick={() => onAnswer(o.key)}
-                >{o.key}</button>
+                  onClick={() => choose(o.key)} onKeyDown={e => chooseKey(e, o.key)}
+                ><span className="okey">{o.key}</span><span data-mark-index={markBase + 1 + optionIndex}>{o.text}</span></div>
               )
             })}
           </div>
-          <div className="hint">点击字母选择填入本空的词，悬停可查看对应单词。</div>
+          <div className="hint">点击字母和单词作答。</div>
         </>
       )}
 
       {q.qtype === 'match' && (
         <>
-          <div className="stem">{q.stem}</div>
+          <div className="stem" data-mark-index={markBase}>{q.stem}</div>
           <div className="letter-row">
             {paragraphLabels.map((L) => {
               let cls = 'L'
@@ -247,7 +263,7 @@ export default function QuestionCard({
           {q.analysis_text && (
             <>
               <div className="analysis-title">解析</div>
-              <div className="analysis-text">{q.analysis_text}</div>
+              <div className="analysis-text" data-mark-index={markBase + 30}>{q.analysis_text}</div>
             </>
           )}
           {q.qtype === 'essay' && analysisData?.materials?.map((m: any, i: number) => {
@@ -257,19 +273,19 @@ export default function QuestionCard({
                 {c.model_essay && (
                   <>
                     <div className="analysis-title">参考范文</div>
-                    <PdfProse className="model-essay" text={c.model_essay}/>
+                    <div data-mark-index={markBase + 50 + i * 4}><PdfProse className="model-essay" text={c.model_essay}/></div>
                   </>
                 )}
                 {c.model_essay_cn && (
                   <>
                     <div className="analysis-title">范文中译</div>
-                    <PdfProse className="model-essay" text={c.model_essay_cn}/>
+                    <div data-mark-index={markBase + 51 + i * 4}><PdfProse className="model-essay" text={c.model_essay_cn}/></div>
                   </>
                 )}
                 {c.paragraph_notes && (
                   <>
                     <div className="analysis-title">逐段写作解析</div>
-                    <div className="analysis-text">{c.paragraph_notes}</div>
+                    <div className="analysis-text" data-mark-index={markBase + 52 + i * 4}>{c.paragraph_notes}</div>
                   </>
                 )}
               </div>
@@ -282,19 +298,19 @@ export default function QuestionCard({
                 {c.reference_translation && (
                   <>
                     <div className="analysis-title">参考译文</div>
-                    <PdfProse className="model-essay" text={c.reference_translation}/>
+                    <div data-mark-index={markBase + 50 + i * 4}><PdfProse className="model-essay" text={c.reference_translation}/></div>
                   </>
                 )}
                 {c.sentence_notes && (
                   <>
                     <div className="analysis-title">逐句解析</div>
-                    <div className="analysis-text">{c.sentence_notes}</div>
+                    <div className="analysis-text" data-mark-index={markBase + 52 + i * 4}>{c.sentence_notes}</div>
                   </>
                 )}
               </div>
             )
           })}
-          <SentenceInsights materials={analysisData?.materials || loadedDetail?.materials}/>
+          <SentenceInsights markBase={markBase} materials={analysisData?.materials || loadedDetail?.materials}/>
           {/* 笔记 */}
           <div className="note-box">
             <div className="analysis-title"><Icon name="note" size={15}/>我的笔记</div>

@@ -1,13 +1,15 @@
 import { Fragment } from 'react'
 import { SubjectivePrompt } from './PdfProse'
 import Icon from './Icon'
+import readingParagraphs from '../readingParagraphs.json'
 
 /** 左侧材料面板：按题型渲染共享材料（文章/词库/段落/写作翻译题面）。 */
 export default function MaterialPanel({
-  section, mat, selectedBlank, onBlankClick,
+  section, mat, selectedBlank, onBlankClick, paperKey,
   wordAnswer, showTranscript, disabled = false, availableBlanks,
 }: {
   section: string
+  paperKey?: string
   mat: any
   selectedBlank: number | null
   onBlankClick: (qNo: number) => void
@@ -30,7 +32,7 @@ export default function MaterialPanel({
             <div key={i} className="listen-group">
               <div className="listen-group-head"><span className="tag info">篇目 {i + 1}</span><b>第 {g.from}–{g.to} 题</b></div>
               {showTranscript && g.lines?.length > 0 && (
-                <div className="transcript">
+                <div className="transcript" data-mark-index={10 + i}>
                   {g.lines.map((l: any, j: number) => (
                     <div key={j} className="transcript-line">
                       <div className="en">{l.speaker && <b>{l.speaker}: </b>}{l.en}</div>
@@ -108,11 +110,18 @@ export default function MaterialPanel({
   }
 
   if (section === 'reading1' || section === 'reading2') {
+    const passage: string = c.passage || ''
+    const cuts: number[] = (readingParagraphs as Record<string, number[]>)[`${paperKey}:${section}`] || []
+    const instructionPattern = /\bQuestions\s+\d+\s+(?:to|and)\s+\d+\s+are\s+based\s+on\s+the\s+following\s+passage\.?/gi
+    const instruction = passage.match(instructionPattern)?.[0]
+    // Cut on source offsets first; PDF extraction sometimes inserts this heading inside the body.
+    const paragraphs = [0, ...cuts, passage.length].slice(0, -1).map((start, i) => passage.slice(start, [...cuts, passage.length][i]).replace(instructionPattern, ' ').trim()).filter(Boolean)
     return (
       <div className="card material-card">
         <div className="material-head"><Icon name="book" size={16}/>仔细阅读{section === 'reading1' ? ' · Passage One' : ' · Passage Two'}</div>
         {mat.directions && <div className="directions">{mat.directions}</div>}
-        <div className="passage">{c.passage}</div>
+        {instruction && <div className="reading-instruction">{instruction}</div>}
+        <div className="passage">{paragraphs.map((p: string, i: number) => <p className="reading-paragraph" key={i}>{p}</p>)}</div>
         {c.passage2 && (
           <>
             <div className="sec-divider">Passage Two</div>
@@ -127,7 +136,7 @@ export default function MaterialPanel({
     return (
       <div className="card material-card">
         <div className="material-head"><Icon name={section === 'writing' ? 'note' : 'text'} size={16}/>{section === 'writing' ? '写作题目' : '翻译题目'}</div>
-        <SubjectivePrompt section={section} text={c.prompt}/>
+        <div data-mark-index={50}><SubjectivePrompt section={section} text={c.prompt}/></div>
       </div>
     )
   }

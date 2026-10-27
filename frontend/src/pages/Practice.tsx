@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   getSession, saveState, markRevealed, submitSession,
@@ -6,6 +6,7 @@ import {
 } from '../api'
 import AudioPlayer from '../components/AudioPlayer'
 import MaterialPanel from '../components/MaterialPanel'
+import MarkableMaterial from '../components/MarkableMaterial'
 import QuestionCard from '../components/QuestionCard'
 import Icon from '../components/Icon'
 import ThemeToggle from '../components/ThemeToggle'
@@ -337,6 +338,17 @@ export default function Practice() {
     return () => observer.disconnect()
   }, [!!data])
 
+  useLayoutEffect(() => {
+    const page = pageRef.current
+    const nav = page?.querySelector<HTMLElement>('.qnav-card')
+    if (!page || !nav) return
+    const measure = () => page.style.setProperty('--question-nav-height', `${Math.ceil(nav.getBoundingClientRect().height)}px`)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(nav)
+    return () => observer.disconnect()
+  }, [!!data, activeSection])
+
   if (err) return <div className="empty-state card"><Icon name="alert" size={32}/><h3>练习加载失败</h3><p>{err}</p><button onClick={() => nav('/')}>返回试卷库</button></div>
   if (!data) return <div className="loading" role="status"><span className="spinner"/>正在加载试卷…</div>
 
@@ -359,11 +371,42 @@ export default function Practice() {
     if (v) wordAnswer[q.q_no] = v
   }
 
+  const busyNow = submitting || restarting
+  const questionButtons = visibleQuestions.map((q: any) => {
+                const ans = answers[q.uid]
+                let cls = 'qn'
+                if (ans) cls += ' answered'
+                if (q.uid === currentUid) cls += ' current'
+                if (favSet.has(q.uid)) cls += ' fav'
+                if (submitted && result?.detail?.[q.uid]) {
+                  const v = result.detail[q.uid].verdict
+                  if (v === 'correct') cls += ' correct'
+                  else if (v === 'wrong') cls += ' wrong'
+                  else if (v === 'no_key') cls += ' nokey'
+                }
+                return (
+                  <button key={q.uid} className={cls} aria-label={`第 ${q.q_no} 题`} aria-current={q.uid === currentUid ? 'true' : undefined}
+                    disabled={busyNow}
+                    onClick={(e) => { focusQuestion(q, true); e.currentTarget.closest('details')?.removeAttribute('open') }}
+                  >{q.q_no}</button>
+                )
+              })
+
   // 客观题进度（不含作文/翻译）
   const objQs = questions.filter((q: any) => q.qtype !== 'essay' && q.qtype !== 'translation')
   const objAnswered = objQs.filter((q: any) => answers[q.uid]).length
-  const busyNow = submitting || restarting
   const fullMode = data.session.mode === 'full'
+  const availableSections = SECTION_ORDER.filter(s => bySection[s]?.length)
+  const currentSectionIndex = availableSections.indexOf(activeSection)
+  function goSection(section: string) {
+    focusQuestion(bySection[section].find(q => q.uid === sectionPositions.current[section]) || bySection[section][0])
+    if (submitted) requestAnimationFrame(() => {
+      const split = pageRef.current?.querySelector('.split')
+      if (split) window.scrollTo({ top: Math.max(0, window.scrollY + split.getBoundingClientRect().top - (toolbarRef.current?.offsetHeight || 0) - 8), behavior: 'instant' })
+    })
+    else window.scrollTo({ top: 0, behavior: 'instant' })
+    pageRef.current?.querySelector('.material')?.scrollTo({ top: 0 })
+  }
 
   return (
     <div className="practice-page" ref={pageRef}>
@@ -402,7 +445,7 @@ export default function Practice() {
                 aria-selected={activeSection === s}
                 className={`${activeSection === s ? 'active' : ''}${done === total ? ' complete' : ''}`}
                 disabled={busyNow}
-                onClick={() => { focusQuestion(bySection[s].find(q => q.uid === sectionPositions.current[s]) || bySection[s][0]); window.scrollTo({ top: 0, behavior: 'instant' }) }}
+                onClick={() => goSection(s)}
               >
                 <span>{SECTION_CN[s]}</span><small>{done}/{total}</small>
               </button>
@@ -454,9 +497,18 @@ export default function Practice() {
 
       {submitted && result && <ResultHero result={result} />}
 
+      <div className="section-side-switch" aria-label="切换题型">
+        {[-1, 1].map(delta => { const target = availableSections[currentSectionIndex + delta]; return <button key={delta} className={delta < 0 ? 'previous' : 'next'} disabled={!target || busyNow} aria-label={target ? `${delta < 0 ? '上一部分' : '下一部分'}：${SECTION_CN[target]}` : (delta < 0 ? '没有上一部分' : '没有下一部分')} title={target ? SECTION_CN[target] : ''} onClick={() => target && goSection(target)}><span aria-hidden="true">{delta < 0 ? '‹' : '›'}</span><small>{target ? SECTION_CN[target] : '已到底'}</small></button> })}
+      </div>
+      <details className="mobile-qnav">
+        <summary>题号导航</summary>
+        <div className="mobile-qnav-panel"><div className="qnav-head">题号导航</div><div className="qnav">{questionButtons}</div></div>
+      </details>
+      <MarkableMaterial key={`${materialPaper}:${activeSection}`} paper={materialPaper} section={activeSection}>
       <div className="split">
         <div className="material">
           <MaterialPanel
+            paperKey={materialPaper}
             section={activeSection}
             mat={mat}
             selectedBlank={selectedBlank}
@@ -478,34 +530,19 @@ export default function Practice() {
             </select></label>
             <span className="muted small">题目与左侧材料按试卷一起切换。</span>
           </div>}
-          <div className="qnav-card">
+          <div className="qnav-card sticky-qnav">
             <div className="qnav-head"><span>题号导航</span><span className="qnav-legend">
               {submitted ? <><i className="lg correct"/>正确<i className="lg wrong"/>错误</> : <><i className="lg answered"/>已答<i className="lg"/>未答</>}<i className="lg fav"/>收藏
             </span></div>
             <div className="qnav">
-              {visibleQuestions.map((q: any) => {
-                const ans = answers[q.uid]
-                let cls = 'qn'
-                if (ans) cls += ' answered'
-                if (q.uid === currentUid) cls += ' current'
-                if (favSet.has(q.uid)) cls += ' fav'
-                if (submitted && result?.detail?.[q.uid]) {
-                  const v = result.detail[q.uid].verdict
-                  if (v === 'correct') cls += ' correct'
-                  else if (v === 'wrong') cls += ' wrong'
-                  else if (v === 'no_key') cls += ' nokey'
-                }
-                return (
-                  <button key={q.uid} className={cls} aria-label={`第 ${q.q_no} 题`} aria-current={q.uid === currentUid ? 'true' : undefined}
-                    disabled={busyNow}
-                    onClick={() => focusQuestion(q, true)}
-                  >{q.q_no}</button>
-                )
-              })}
+              {questionButtons}
             </div>
           </div>
 
-          {visibleQuestions.map((q: any) => {
+          {visibleQuestions.map((q: any, index: number) => {
+            const group = activeSection === 'listening' ? (mat?.content?.groups || []).find((g: any) => g.key === q.group_key || (q.q_no >= g.from && q.q_no <= g.to)) : null
+            const previous = visibleQuestions[index - 1]
+            const groupStart = group && (!previous || !(previous.q_no >= group.from && previous.q_no <= group.to))
             const ownSections = data.sections_by_paper?.[q.paper_key] || sections
             const ownMat = ownSections[q.section]?.main || Object.values(ownSections[q.section] || {})[0] as any
             const extra = analysisMap[q.uid] || {}
@@ -514,8 +551,9 @@ export default function Practice() {
               ? extra
               : { materials: Object.values(ownSections[q.section] || {}), note: '' }
             return (
+              <Fragment key={q.uid}>
+              {groupStart && <div className="listening-divider"><b>听力篇目 {(mat?.content?.groups || []).indexOf(group) + 1}</b><span>第 {group.from}–{group.to} 题</span></div>}
               <QuestionCard
-                key={q.uid}
                 q={qd}
                 answer={answers[q.uid]}
                 onAnswer={(v) => setAnswer(q.uid, v)}
@@ -529,6 +567,7 @@ export default function Practice() {
                 analysisData={analysisData}
                 paragraphLabels={q.qtype === 'match' ? (ownMat?.content?.paragraphs || []).map((p: any) => p.label) : paragraphLabels}
               />
+              </Fragment>
             )
           })}
 
@@ -537,6 +576,7 @@ export default function Practice() {
           )}
         </div>
       </div>
+      </MarkableMaterial>
     </div>
   )
 }

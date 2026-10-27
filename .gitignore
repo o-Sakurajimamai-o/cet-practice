@@ -21,3 +21,4 @@ review/
 build-input/
 release-assets/
 test-results/
+.DS_Store

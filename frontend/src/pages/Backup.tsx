@@ -52,7 +52,7 @@ export default function Backup() {
         <div className="feature-icon indigo"><Icon name="download" size={24}/></div>
         <h2>导出学习记录</h2>
         <p>将此设备上的个人学习数据保存为 JSON 文件，建议另存一份到其他磁盘。</p>
-        <div className="backup-list">{['作答与草稿', '练习进度', '交卷结果', '错题与收藏', '学习笔记', '人工校正'].map(t => <span key={t}><Icon name="check" size={13}/>{t}</span>)}</div>
+        <div className="backup-list">{['作答与草稿', '练习进度', '交卷结果', '错题与收藏', '学习笔记', '文章标记', '人工校正'].map(t => <span key={t}><Icon name="check" size={13}/>{t}</span>)}</div>
         <button className="primary big" disabled={exporting || busy} onClick={doExport}><Icon name="download" size={17}/>{exporting ? '正在导出…' : '下载备份文件'}</button>
         <div className="backup-hint">导出文件仅包含个人记录，题库本体由源 PDF 重新导入。</div>
       </section>
@@ -73,8 +73,8 @@ export default function Backup() {
         <p className="backup-hint">合并时，笔记按更新时间保留较新内容；来源不同但编号相同的练习会另建记录，重复导入同一份备份不会重复创建。替换时，备份未覆盖的题目校正仍会保留，避免把已修正的答案还原。</p>
       </section>
     </div>
-    {confirming && <div className="notice error confirm-notice" role="alert"><div><b>确认用「{fileName}」替换学习记录？</b><div>当前的作答、错题、收藏和笔记将被备份中的记录替换。备份未覆盖的题目校正会保留，避免把已修正的答案还原。建议先下载一份当前备份。</div></div><div className="notice-actions"><button className="danger" disabled={busy || exporting} onClick={() => doImport(true)}>确认替换</button><button disabled={busy} onClick={() => setConfirming(false)}>取消</button></div></div>}
+    {confirming && <div className="notice error confirm-notice" role="alert"><div><b>确认用「{fileName}」替换学习记录？</b><div>当前的作答、错题、收藏、笔记和文章标记将被备份中的记录替换。备份未覆盖的题目校正会保留，避免把已修正的答案还原。建议先下载一份当前备份。</div></div><div className="notice-actions"><button className="danger" disabled={busy || exporting} onClick={() => doImport(true)}>确认替换</button><button disabled={busy} onClick={() => setConfirming(false)}>取消</button></div></div>}
     {err && <div className="notice error" role="alert"><span><Icon name="alert" size={16}/>{err}</span></div>}
-    {result?.imported && <div className="card restore-result" role="status"><h3><Icon name="check" size={20}/>记录已恢复</h3><div className="result-stats">{Object.entries({sessions:'新增会话',wrong_book:'错题',favorites:'收藏',notes:'笔记',manual_fixes:'人工校正'}).map(([k,v]) => <div className="rs" key={k}><b>{result.imported[k]}</b><span>{v}</span></div>)}</div>{result.retained_manual_fixes > 0 && <p className="muted small">另保留了本地 {result.retained_manual_fixes} 条题目校正。</p>}<p className="muted small">可以在「复习空间 → 练习历史」核对恢复结果。</p></div>}
+    {result?.imported && <div className="card restore-result" role="status"><h3><Icon name="check" size={20}/>记录已恢复</h3><div className="result-stats">{Object.entries({sessions:'新增会话',wrong_book:'错题',favorites:'收藏',notes:'笔记',text_marks:'文章标记',manual_fixes:'人工校正'}).map(([k,v]) => <div className="rs" key={k}><b>{result.imported[k]}</b><span>{v}</span></div>)}</div>{result.retained_manual_fixes > 0 && <p className="muted small">另保留了本地 {result.retained_manual_fixes} 条题目校正。</p>}<p className="muted small">可以在「复习空间 → 练习历史」核对恢复结果。</p></div>}
   </div>
 }

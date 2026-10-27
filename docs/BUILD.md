@@ -2,7 +2,7 @@
 
 Windows x64，Python 3.12，Node.js 18+。
 
-从 Release 便携包提取 `_internal/seed` 为仓库根目录的 `seed`，并准备 `resources`。源码仓库不包含个人数据库、题库、音频或 PDF。
+从当前 Release 的 Windows 便携包提取 `_internal/seed` 为仓库根目录的 `seed`，并准备 `resources`。源码仓库不包含个人数据库、题库、音频或 PDF。
 
 ```powershell
 python -m venv backend/venv
@@ -18,7 +18,7 @@ backend/venv/Scripts/python.exe packaging/launcher.py
 
 ## macOS
 
-使用对应架构的 macOS 14+、Python 3.12.10、Node.js 22。在 macOS 主机上构建，不能从 Windows 交叉生成。GitHub Actions 的 `Build and verify macOS apps` 工作流分别运行于 Apple 芯片和 Intel macOS 主机，构建并验证完整 ZIP，供手动发布。
+使用对应架构的 macOS 14+、Python 3.12.10、Node.js 22。在 macOS 主机上构建，不能从 Windows 交叉生成。GitHub Actions 的 `Build and verify v1.2.0` 工作流分别运行于 Windows、Apple 芯片和 Intel macOS 主机，构建并验证完整 ZIP。
 
 ```sh
 python3 -m venv .venv
@@ -36,4 +36,4 @@ python -m playwright install webkit
 python tests/test_macos_package.py --arch arm64
 ```
 
-`fetch_release_data.py` 只提取经过 SHA-256 核验的公开 v1.1.0 题库与听力，不读取开发机个人数据库。打包前校验种子库完整性及个人表为空。macOS 成品包含题库与音频，本地数据写入 Application Support；不修改签名应用。签名为 ad-hoc，未进行 Apple 公证，首次打开操作见 [Mac 使用说明](MACOS.md)。
+`fetch_release_data.py` 只提取经过 SHA-256 核验的公开 v1.1.0 听力及升级验证种子，不读取开发机个人数据库。构建前需按上文准备当前版本 `seed`；工作流在发布准备阶段从草稿取得经校验的清洁种子。打包前校验数据库完整性及个人表为空。macOS 成品包含题库与音频，本地数据写入 Application Support；不修改签名应用。签名为 ad-hoc，未进行 Apple 公证，首次打开操作见 [Mac 使用说明](MACOS.md)。

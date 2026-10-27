@@ -133,8 +133,9 @@ export default function Papers() {
                 {p.status === 'in_progress' && <div className="set-progress"><div className="progress-track"><span style={{ width: `${Math.min(100, (p.active_answered / Math.max(1, p.objective_total)) * 100)}%` }}/></div><span>{p.active_answered}/{p.objective_total}</span></div>}
               </div>
               <div className="set-actions">
-                <button className={`paper-action${p.status === 'in_progress' ? ' primary' : ''}`} disabled={!!busy || switching} onClick={() => start(p)} aria-label={`${p.status === 'in_progress' ? '继续练习' : p.status === 'done' ? '再练一次' : '开始练习'}：${paperTitle(p)}`}>{busy === p.paper_key ? '打开中' : p.status === 'in_progress' ? '继续' : p.status === 'done' ? '再练' : '开始'}<Icon name="arrow" size={15}/></button>
-                {p.active_session_id && <button className="restart-link" title="新建空白练习，保留之前的作答" disabled={!!busy || switching} onClick={() => start(p, true)}>重新开始</button>}
+                <button className={`paper-action${p.status === 'in_progress' ? ' primary' : ''}`} disabled={!!busy || switching} onClick={() => start(p)} aria-label={`${p.status === 'in_progress' ? '继续练习' : p.status === 'done' ? '复盘已完成练习' : '开始练习'}：${paperTitle(p)}`}>{busy === p.paper_key ? '打开中' : p.status === 'in_progress' ? '继续' : p.status === 'done' ? '复盘' : '开始'}<Icon name="arrow" size={15}/></button>
+                {p.active_session_id && p.last_submitted_session_id && <button className="restart-link" disabled={!!busy || switching} onClick={() => nav(`/practice/${p.last_submitted_session_id}`)}>查看上次交卷</button>}
+                {(p.active_session_id || p.last_submitted_session_id) && <button className="restart-link" title="新建空白练习，保留之前的作答" disabled={!!busy || switching} onClick={() => start(p, true)}>重新开始</button>}
               </div>
             </li>
           })}</ul>

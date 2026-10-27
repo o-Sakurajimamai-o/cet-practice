@@ -1,0 +1,91 @@
+name: Build and verify v1.2.0
+
+on:
+  push:
+    branches: [release-v1.2.0-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            platform: windows
+            arch: x64
+            artifact: Windows-x64
+          - runner: macos-14
+            platform: macos
+            arch: arm64
+            artifact: macOS-arm64
+          - runner: macos-15-intel
+            platform: macos
+            arch: x86_64
+            artifact: macOS-x86_64
+    name: ${{ matrix.artifact }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12.10'
+          architecture: ${{ matrix.arch == 'arm64' && 'arm64' || 'x64' }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Install Windows build dependencies
+        if: matrix.platform == 'windows'
+        run: python -m pip install -r packaging/requirements-build.txt
+      - name: Install macOS build dependencies
+        if: matrix.platform == 'macos'
+        run: python -m pip install -r packaging/requirements-macos.txt
+      - name: Fetch verified public audio and old upgrade fixture
+        run: python packaging/fetch_release_data.py
+      - name: Fetch audited clean question bank
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python packaging/fetch_build_seed.py
+      - name: Verify and install clean seed
+        run: python packaging/install_build_seed.py
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Backend regressions with temporary databases
+        run: python tests/test_backend_regressions.py
+      - name: Build Windows application
+        if: matrix.platform == 'windows'
+        run: |
+          python packaging/build_windows.py
+          python packaging/package_windows.py
+      - name: Build macOS application
+        if: matrix.platform == 'macos'
+        run: python packaging/build_macos.py --arch '${{ matrix.arch }}'
+      - name: Install browser verification tools
+        run: python -m pip install playwright==1.56.0
+      - name: Install WebKit for macOS tests
+        if: matrix.platform == 'macos'
+        run: python -m playwright install webkit
+      - name: Verify Windows ZIP
+        if: matrix.platform == 'windows'
+        timeout-minutes: 10
+        run: python tests/test_windows_package.py
+      - name: Verify macOS ZIP
+        if: matrix.platform == 'macos'
+        timeout-minutes: 8
+        run: python tests/test_macos_package.py --arch '${{ matrix.arch }}'
+      - name: Upload verified packages and reports
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.artifact }}
+          path: release-assets/*
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error

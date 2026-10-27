@@ -8,10 +8,12 @@ Windows / macOS 本地四六级练习工具，题目、解析、听力和练习�
 
 进入 [Releases](https://github.com/o-Sakurajimamai-o/cet-practice/releases/latest)，按系统下载，无需安装 Python 或 Node.js：
 
-- **Windows**：[v1.1.0 便携版](https://github.com/o-Sakurajimamai-o/cet-practice/releases/tag/v1.1.0)，解压后双击 `CET-Practice.exe`；停止时运行 `Stop.bat`。
+- **Windows**：下载 `Windows-x64.zip`，解压后双击 `CET-Practice.exe`；停止时运行 `Stop.bat`。
 - **macOS 14+**：M 系列芯片下载 `macOS-arm64.zip`，Intel 芯片下载 `macOS-x86_64.zip`，解压后将 `.app` 拖到「应用程序」打开。首次打开提示及退出方式见 [Mac 使用说明](docs/MACOS.md)。
 
 包含四级 2020—2026 年 46 套、六级 2015—2026 年 76 套，共 6,089 题；含现有 76 份独立听力。部分四级套次按来源标注共用材料。支持作答保存、错题、收藏、笔记和句子精讲。
+
+本版改进题型切换、题号导航、阅读分段、听力分组和选词填空，并支持在正文、题目及解析中标记文字，以及重新复盘已交卷试卷。
 
 Windows 旧版请解压到新目录，再用「备份与恢复」迁移记录。Windows 数据在程序旁的 `data`；Mac 数据在 `~/Library/Application Support/CET-Practice/data`。分享时请发送原始发布压缩包。
 

@@ -10,6 +10,16 @@ DB_PATH = Path(os.environ.get("CET6_DB_PATH", Path(__file__).resolve().parents[2
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
+CREATE TABLE IF NOT EXISTS text_marks (
+    id TEXT PRIMARY KEY,
+    paper_key TEXT NOT NULL,
+    section TEXT NOT NULL,
+    passage_index INTEGER NOT NULL,
+    start_offset INTEGER NOT NULL,
+    end_offset INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

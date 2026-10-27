@@ -1,4 +1,4 @@
-"""Reuse only verified public seed/audio from the existing Windows release."""
+"""Reuse verified public audio from v1.1.0; install the new clean seed separately."""
 import hashlib
 import shutil
 import sqlite3
@@ -18,7 +18,7 @@ def verify_seed(path):
         assert not conn.execute('PRAGMA foreign_key_check').fetchall()
         assert conn.execute('SELECT COUNT(*) FROM papers').fetchone()[0] == 122
         assert conn.execute('SELECT COUNT(*) FROM questions').fetchone()[0] == 6089
-        for table in ['sessions', 'wrong_book', 'favorites', 'notes', 'manual_fixes', 'meta']:
+        for table in ['sessions', 'wrong_book', 'favorites', 'notes', 'text_marks', 'manual_fixes', 'meta']:
             assert conn.execute('SELECT COUNT(*) FROM ' + table).fetchone()[0] == 0, table
 
 
@@ -37,8 +37,8 @@ def main():
             pieces = item.filename.split('/')
             # The v1.1.0 ZIP has a single CET-Practice top-level directory.
             relative = '/'.join(pieces[1:])
-            if relative.startswith('_internal/seed/'):
-                relative = relative.removeprefix('_internal/')
+            if relative == '_internal/seed/cet6.db':
+                relative = 'build-input/legacy-v1.1.0-cet6.db'
             elif not relative.startswith('resources/'):
                 continue
             if item.is_dir():
@@ -48,9 +48,8 @@ def main():
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(z.read(item))
             count += 1
-    verify_seed(PROJECT / 'seed/cet6.db')
     assert len(list((PROJECT / 'resources').rglob('*.m4a'))) == 76
-    print(f'Public data verified: {count} files; 122 papers; 6089 questions; no personal records.')
+    print(f'Public audio verified: {count} files; 76 independent audio files.')
 
 
 if __name__ == '__main__':

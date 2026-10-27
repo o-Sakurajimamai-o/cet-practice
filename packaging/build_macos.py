@@ -13,7 +13,7 @@ from pathlib import Path
 from fetch_release_data import verify_seed
 
 PROJECT = Path(__file__).resolve().parents[1]
-VERSION = '1.1.1'
+VERSION = '1.2.0'
 
 
 def build(arch):
@@ -72,7 +72,16 @@ def build(arch):
     for name in ['THIRD_PARTY_NOTICES.md', 'LICENSE-NOTICE.md']:
         shutil.copy2(PROJECT / name, package / name)
     stop = package / '停止.command'
-    stop.write_text('#!/bin/sh\ncd "$(dirname "$0")" || exit 1\nexec "./CET-Practice.app/Contents/MacOS/CET-Practice" --stop\n', encoding='utf-8')
+    stop.write_text('''#!/bin/sh
+cd "$(dirname "$0")" || exit 1
+for app in "./CET-Practice.app" "$HOME/Applications/CET-Practice.app" "/Applications/CET-Practice.app"; do
+    if [ -x "$app/Contents/MacOS/CET-Practice" ]; then
+        exec "$app/Contents/MacOS/CET-Practice" --stop
+    fi
+done
+printf '%s\\n' '未找到 CET-Practice.app，请使用菜单栏「四六级」退出。'
+exit 1
+''', encoding='utf-8')
     stop.chmod(0o755)
     out = PROJECT / 'release-assets'
     out.mkdir(exist_ok=True)

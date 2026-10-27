@@ -144,7 +144,8 @@ def list_papers(year: int | None = None, month: int | None = None,
             ).fetchall()
             answered = 0
             active = None
-            last_submitted = next((row["submitted_at"] for row in s if row["submitted_at"]), None)
+            last_submitted_row = next((row for row in s if row["submitted_at"]), None)
+            last_submitted = last_submitted_row["submitted_at"] if last_submitted_row else None
             has_work = False
             # The newest attempt owns the current status. Older attempts remain available.
             latest = s[0] if s else None
@@ -165,6 +166,7 @@ def list_papers(year: int | None = None, month: int | None = None,
             p["active_updated_at"] = (latest["updated_at"] or latest["started_at"]) if active else None
             p["active_answered"] = answered
             p["last_submitted_at"] = last_submitted
+            p["last_submitted_session_id"] = last_submitted_row["id"] if last_submitted_row else None
             p["status"] = (
                 ("in_progress" if has_work else "not_started") if active else
                 ("done" if last_submitted else "not_started")
@@ -275,8 +277,9 @@ def create_session(paper_key: str, mode: Literal["full", "redo", "wrong_redo"] =
                 "SELECT id, submitted_at FROM sessions WHERE paper_id=? AND mode='full' "
                 "ORDER BY id DESC LIMIT 1", (p["id"],),
             ).fetchone()
-            if row and row["submitted_at"] is None:
-                return {"session_id": row["id"], "resumed": True}
+            if row:
+                return {"session_id": row["id"], "resumed": not bool(row["submitted_at"]),
+                        "reviewing": bool(row["submitted_at"])}
         cur = conn.execute(
             "INSERT INTO sessions(paper_id, mode, session_key) VALUES(?,?,?)", (p["id"], mode, str(uuid.uuid4()))
         )
@@ -804,6 +807,64 @@ def import_report(exam: Literal["cet4", "cet6"] | None = None):
         conn.close()
 
 
+# ================================================================ 文章标记
+class TextMark(BaseModel):
+    id: str = Field(min_length=1, max_length=64)
+    paper_key: str = Field(min_length=1, max_length=100)
+    section: Literal["listening", "cloze", "matching", "reading1", "reading2", "writing", "translation"]
+    passage_index: int = Field(ge=0, le=999999)
+    start_offset: int = Field(ge=0, le=1000000)
+    end_offset: int = Field(ge=1, le=1000000)
+    text: str = Field(min_length=1, max_length=500)
+    created_at: str
+
+
+def _validate_mark(conn, row):
+    try:
+        mark = TextMark(**row)
+        uuid.UUID(mark.id)
+        datetime.fromisoformat(mark.created_at)
+        if mark.end_offset <= mark.start_offset or mark.end_offset - mark.start_offset != len(mark.text.encode('utf-16-le')) // 2:
+            raise ValueError("offset")
+        if not conn.execute("SELECT 1 FROM papers WHERE paper_key=?", (mark.paper_key,)).fetchone():
+            raise ValueError("paper")
+    except (ValueError, TypeError, KeyError) as exc:
+        raise HTTPException(400, "标记记录无效") from exc
+    return mark.model_dump()
+
+
+@app.get("/api/marks")
+def get_marks(paper_key: str, section: str):
+    conn = db.connect()
+    try:
+        return {"marks": [dict(r) for r in conn.execute("SELECT * FROM text_marks WHERE paper_key=? AND section=? ORDER BY created_at", (paper_key, section))]}
+    finally:
+        conn.close()
+
+
+@app.post("/api/marks")
+def add_mark(body: TextMark):
+    conn = db.connect()
+    try:
+        row = _validate_mark(conn, body.model_dump())
+        conn.execute("INSERT INTO text_marks(id,paper_key,section,passage_index,start_offset,end_offset,text,created_at) VALUES(:id,:paper_key,:section,:passage_index,:start_offset,:end_offset,:text,:created_at)", row)
+        conn.commit()
+        return row
+    finally:
+        conn.close()
+
+
+@app.delete("/api/marks/{mark_id}")
+def delete_mark(mark_id: str):
+    conn = db.connect()
+    try:
+        conn.execute("DELETE FROM text_marks WHERE id=?", (mark_id,))
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
 # ================================================================ 备份/恢复
 @app.get("/api/backup/export")
 def backup_export():
@@ -820,6 +881,7 @@ def backup_export():
             "wrong_book": [dict(r) for r in conn.execute("SELECT * FROM wrong_book").fetchall()],
             "favorites": [dict(r) for r in conn.execute("SELECT * FROM favorites").fetchall()],
             "notes": [dict(r) for r in conn.execute("SELECT * FROM notes").fetchall()],
+            "text_marks": [dict(r) for r in conn.execute("SELECT * FROM text_marks").fetchall()],
             "manual_fixes": [dict(r) for r in conn.execute("SELECT * FROM manual_fixes").fetchall()],
         }
         fname = f"cet6-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
@@ -926,6 +988,19 @@ def _prepare_backup(conn, data):
                 raise HTTPException(400, f"{table} 含重复记录，未修改任何数据")
             seen.add(key)
             prepared[table].append(dict(row))
+    marks = data.get("text_marks", [])
+    if not isinstance(marks, list):
+        raise HTTPException(400, "标记列表无效，未修改任何数据")
+    prepared["text_marks"] = []
+    mark_ids = set()
+    for row in marks:
+        if not isinstance(row, dict):
+            raise HTTPException(400, "标记记录无效，未修改任何数据")
+        mark = _validate_mark(conn, row)
+        if mark["id"] in mark_ids:
+            raise HTTPException(400, "标记记录重复，未修改任何数据")
+        mark_ids.add(mark["id"])
+        prepared["text_marks"].append(mark)
     papers = {row["paper_key"]: row["id"] for row in conn.execute("SELECT id, paper_key FROM papers")}
     paper_ids = {pid: key for key, pid in papers.items()}
     questions = {row["uid"]: row for row in conn.execute(
@@ -1101,6 +1176,7 @@ def backup_import(body: BackupImport, merge: bool = Query(True)):
             conn.execute("DELETE FROM sessions")
             conn.execute("DELETE FROM favorites")
             conn.execute("DELETE FROM notes")
+            conn.execute("DELETE FROM text_marks")
         for s in imports:
             conn.execute(
                 "INSERT INTO sessions(id, paper_id, mode, started_at, updated_at, submitted_at, "
@@ -1154,6 +1230,9 @@ def backup_import(body: BackupImport, merge: bool = Query(True)):
                 (row["uid"], row.get("text", ""), row.get("updated_at")),
             )
             counts["notes"] += 1
+        for mark in d["text_marks"]:
+            counts["text_marks"] += conn.execute(
+                "INSERT OR IGNORE INTO text_marks(id,paper_key,section,passage_index,start_offset,end_offset,text,created_at) VALUES(:id,:paper_key,:section,:passage_index,:start_offset,:end_offset,:text,:created_at)", mark).rowcount
         retained_fixes = {(row["uid"], row["field"]) for row in conn.execute("SELECT uid, field FROM manual_fixes")}
         for fx in d["manual_fixes"]:
             current = conn.execute("SELECT created_at FROM manual_fixes WHERE uid=? AND field=?",
@@ -1218,7 +1297,7 @@ def audio_file(paper_key: str, request: Request):
 def pdf_file(path: str = Query(...)):
     p = _safe_source_path(path, PDF_ROOT)
     if p.suffix.lower() != ".pdf" or not p.is_file():
-        return HTMLResponse('<!doctype html><meta charset="utf-8"><title>可选原卷资源</title><main style="max-width:620px;margin:60px auto;padding:24px;font:18px/1.8 system-ui"><h1>尚未安装这份原 PDF</h1><p>正常刷题、答案解析、句子精讲和听力不受影响。</p><p>下载 Optional-PDF 补充包：Windows 将 resources 合并到程序目录；macOS 在菜单栏「四六级 → 选择原 PDF 文件夹」中选择解压后的文件夹。</p></main>', status_code=404)
+        return HTMLResponse('<!doctype html><meta charset="utf-8"><title>可选原卷资源</title><main style="max-width:620px;margin:60px auto;padding:24px;font:18px/1.8 system-ui"><h1>尚未安装这份原 PDF</h1><p>正常刷题、答案解析、句子精讲和听力不受影响。</p><p>Windows：将 Optional-PDF 的 resources 合并到程序目录。macOS：在菜单栏「四六级 → 选择原 PDF 文件夹」选择解压后的文件夹。</p></main>', status_code=404)
     return FileResponse(p, media_type="application/pdf", filename=p.name)
 
 
@@ -1230,7 +1309,7 @@ def startup():
 
 @app.get("/api/health")
 def local_health():
-    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.1.1"}
+    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.2.0"}
 
 @app.post("/api/local/shutdown")
 def local_shutdown(request: Request):
