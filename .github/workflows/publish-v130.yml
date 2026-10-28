@@ -1,0 +1,196 @@
+name: Publish verified v1.3.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful three-platform build workflow run ID
+        required: true
+        type: string
+      source_sha:
+        description: Exact tested source commit
+        required: true
+        type: string
+      release_id:
+        description: Draft release ID
+        required: false
+        type: string
+        default: '426395592'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ inputs.run_id }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      RELEASE_ID: ${{ inputs.release_id || '426395592' }}
+    steps:
+      - name: Validate tested source and workflow
+        run: |
+          python3 - <<'PY'
+          import os,re
+          assert re.fullmatch(r'[0-9]+',os.environ['RUN_ID'])
+          assert re.fullmatch(r'[0-9a-f]{40}',os.environ['SOURCE_SHA'])
+          PY
+          gh run view "$RUN_ID" --json conclusion,headSha > /tmp/tested-run.json
+          python3 - <<'PY'
+          import json,os
+          run=json.load(open('/tmp/tested-run.json'))
+          assert run['conclusion']=='success' and run['headSha']==os.environ['SOURCE_SHA']
+          PY
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Retrieve verified builds
+        run: |
+          gh run download "$RUN_ID" -n Windows-x64 -D assets/Windows-x64
+          gh run download "$RUN_ID" -n macOS-arm64 -D assets/macOS-arm64
+          gh run download "$RUN_ID" -n macOS-x86_64 -D assets/macOS-x86_64
+      - name: Prepare source archive
+        run: |
+          mkdir release
+          git archive --format=zip --prefix=cet-practice/ -o release/CET-Practice-v1.3.0-Source.zip "$SOURCE_SHA"
+      - name: Verify packages and prepare release notes
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,shutil
+          from pathlib import Path
+          out=Path('release'); reports={}; manifest=[]
+          for platform in ['Windows-x64','macOS-arm64','macOS-x86_64']:
+              directory=Path('assets')/platform
+              report=json.loads((directory/f'verification-{platform}.json').read_text())
+              build=json.loads((directory/f'build-{platform}.json').read_text())
+              assert report['passed'] and len(report['checks'])>=130
+              for check in ['selected option text can be marked','word mark survives reload',
+                            'side switch and cloze word bank','reading passage has paragraph breaks',
+                            'listening passages are grouped','question navigation is present',
+                            'bilingual paragraphs aligned','translation toggles back to original',
+                            'marked word statistics visible','marked word export available']:
+                  assert check in report['checks'],(platform,check)
+              if platform.startswith('macOS-'):
+                  assert report['architecture']==platform.removeprefix('macOS-')
+                  assert 'upgrade preserves existing progress' in report['checks']
+                  assert 'stop script locates app moved to Applications' in report['checks']
+              else:
+                  assert 'old Windows progress survives upgrade' in report['checks']
+              package=directory/f'CET-Practice-v1.3.0-{platform}.zip'
+              assert hashlib.file_digest(package.open('rb'),'sha256').hexdigest()==build['sha256']
+              assert package.stat().st_size==build['bytes']<2*1024**3
+              shutil.copy2(package,out/package.name)
+              for name in [f'verification-{platform}.json',f'build-{platform}.json',f'browser-{platform}.png']:
+                  shutil.copy2(directory/name,out/name)
+              reports[platform]=report
+          for package in sorted(out.glob('*.zip')):
+              manifest.append({'name':package.name,'bytes':package.stat().st_size,'sha256':hashlib.file_digest(package.open('rb'),'sha256').hexdigest()})
+          (out/'SHA256SUMS.txt').write_text(''.join(f"{a['sha256']}  {a['name']}\n" for a in manifest),encoding='utf-8')
+          (out/'manifest.json').write_text(json.dumps({'source_commit':os.environ['SOURCE_SHA'],'build_run_id':os.environ['RUN_ID'],'assets':manifest},indent=2),encoding='utf-8')
+          fallback=any('unsupported browser shows mark-list fallback' in r['checks'] for r in reports.values())
+          notes='''四六级研习室 v1.3.0：更新练习体验，支持 Windows 和 macOS。
+
+          - 优化题型左右切换和题目导航；选中文字后点击空白处，标记浮钮会收起。
+          - 复习空间集中查看、统计、搜索和导出标记的单词或句子。
+          - 仔细阅读一、二交卷后可切换原文与逐段中英对照。
+          - 原有听力分组、阅读分段、题目解析与练习记录功能继续保留。
+
+          下载时 Windows 选择 `Windows-x64.zip`；Mac M 系列选择 `macOS-arm64.zip`，Intel 选择 `macOS-x86_64.zip`。Mac 需要 macOS 14 或更高版本；无需安装 Python 或 Node.js。
+
+          Windows 旧版请解压到新目录，再通过网站「备份与恢复」迁移记录。Mac 退出旧版并替换应用后，原记录仍保存在 `~/Library/Application Support/CET-Practice/data`。
+
+          Mac 应用使用 ad-hoc 签名，尚未经过 Apple 开发者签名和公证；首次被拦截时，确认下载自本项目，再到「系统设置 → 隐私与安全性 → 仍要打开」。详见 [Mac 使用说明](https://github.com/o-Sakurajimamai-o/cet-practice/blob/v1.3.0/docs/MACOS.md)。
+
+          原 PDF 是可选资源，可沿用 [v1.1.0 Optional-PDF 补充包](https://github.com/o-Sakurajimamai-o/cet-practice/releases/tag/v1.1.0)。题库第三方参考答案存在来源差异，阅读分段和译文对应关系经过自动核对，未逐篇人工复核。
+
+          三个平台均在对应系统环境验证启动、听力、标记、切换和旧版数据；发布包没有个人练习记录。尚未在群友的实体 Mac 上验收。
+
+          感谢 [Linux Do 社区](https://linux.do/)。
+          '''
+          notes='\n'.join(line[10:] if line.startswith(' '*10) else line for line in notes.splitlines())
+          if fallback:
+              notes+='\n部分测试浏览器不支持文章内高亮，已保存的标记仍可在标记列表查看。\n'
+          notes+='\n\n自动检查数：'+', '.join(f"{p} {len(r['checks'])} 项" for p,r in reports.items())+'。\n'
+          notes+='\n附件大小：\n'+''.join(f"- {a['name']}：{a['bytes']/1024**2:.2f} MiB\n" for a in manifest)
+          (out/'release-notes.md').write_text(notes,encoding='utf-8')
+          PY
+      - name: Resume draft and upload verified assets
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,subprocess,urllib.parse
+          from pathlib import Path
+          base='repos/'+os.environ['GH_REPO']
+          def api(path): return json.loads(subprocess.check_output(['gh','api',path]))
+
+          release = None
+          rel_id = os.environ.get('RELEASE_ID')
+          if rel_id:
+              try:
+                  release = api(base + '/releases/' + str(rel_id))
+              except Exception as e:
+                  print('Direct release ID lookup failed:', e)
+          if release is None:
+              release = next((r for r in api(base+'/releases?per_page=100') if r.get('tag_name')=='v1.3.0'), None)
+          if release is None:
+              try:
+                  v = json.loads(subprocess.check_output(['gh', 'release', 'view', 'v1.3.0', '--json', 'id,tagName,isDraft,assets,targetCommitish']))
+                  release = api(base + '/releases/' + str(v['id']))
+              except Exception as e:
+                  print('gh release view failed:', e)
+          assert release is not None, 'Could not find v1.3.0 release'
+          assert release['draft'], 'Release is not in draft status'
+          assert release['target_commitish'] == os.environ['SOURCE_SHA'], f"target_commitish {release['target_commitish']} != {os.environ['SOURCE_SHA']}"
+
+          Path('/tmp/release-id').write_text(str(release['id']))
+          for path in [*Path('release').glob('*.zip'),Path('release/SHA256SUMS.txt')]:
+              digest='sha256:'+hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
+              asset=next((a for a in release.get('assets',[]) if a['name']==path.name),None)
+              if asset and asset['size']==path.stat().st_size and asset['digest']==digest:
+                  print('Verified existing draft asset: '+path.name,flush=True);continue
+              if asset:
+                  subprocess.run(['gh','api','--method','DELETE',base+'/releases/assets/'+str(asset['id'])],check=True)
+              res = subprocess.run(['gh','release','upload','v1.3.0',str(path)])
+              if res.returncode != 0:
+                  upload_url = release['upload_url'].split('{')[0] + '?name=' + urllib.parse.quote(path.name)
+                  subprocess.run(['gh', 'api', '--method', 'POST', upload_url,
+                                  '-H', 'Content-Type: application/zip' if path.suffix == '.zip' else 'Content-Type: text/plain',
+                                  '--input', str(path)], check=True)
+          PY
+      - name: Verify assets, remove build-only seed, and publish
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          base='repos/'+os.environ['GH_REPO']; endpoint=base+'/releases/'+Path('/tmp/release-id').read_text()
+          release=json.loads(subprocess.check_output(['gh','api',endpoint]))
+          assert release['draft']
+          final=[*Path('release').glob('*.zip'),Path('release/SHA256SUMS.txt')]
+          for path in final:
+              asset=next(a for a in release['assets'] if a['name']==path.name)
+              assert asset['size']==path.stat().st_size
+              assert asset['digest']=='sha256:'+hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
+          seed=next((a for a in release['assets'] if a['name']=='CET-Practice-v1.3.0-clean-build-seed.zip'),None)
+          if seed:
+              assert seed['digest']=='sha256:84920b9447ffedc05a861013067b9ce4a64f93af3644d962a45003b9d7b9f998'
+              subprocess.run(['gh','api','--method','DELETE',base+'/releases/assets/'+str(seed['id'])],check=True)
+          after=json.loads(subprocess.check_output(['gh','api',endpoint]))
+          assert {a['name'] for a in after['assets']}=={p.name for p in final}
+          body={'draft':False,'make_latest':'true','body':Path('release/release-notes.md').read_text(encoding='utf-8')}
+          subprocess.run(['gh','api','--method','PATCH',endpoint,'--input','-'],input=json.dumps(body,ensure_ascii=False),text=True,check=True,stdout=subprocess.DEVNULL)
+          PY
+      - name: Save publication evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: v1.3.0-publication-evidence
+          path: |
+            release/*.json
+            release/*.txt
+            release/*.md
+            release/*.png
+          retention-days: 30
+          if-no-files-found: error
