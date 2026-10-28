@@ -94,7 +94,7 @@ def run(archive, arch):
         try:
             check('host architecture', platform.machine() == arch)
             info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
-            check('native menu app metadata', info['LSUIElement'] and info['CFBundleShortVersionString'] == '1.2.0')
+            check('native menu app metadata', info['LSUIElement'] and info['CFBundleShortVersionString'] == '1.3.0')
             check('ZIP preserves executable permissions', os.access(binary, os.X_OK))
             subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
             check('extracted application signature valid', True)
@@ -107,7 +107,7 @@ def run(archive, arch):
             check('port collision leaves other listener untouched', port != blocker.getsockname()[1])
             blocker.close()
             check('frontend served', b'id="root"' in request(port, '/')[2])
-            check('backend version', api(port, '/api/health')['version'] == '1.2.0')
+            check('backend version', api(port, '/api/health')['version'] == '1.3.0')
             papers = api(port, '/api/papers')['papers']
             check('122 papers available', len(papers) == 122)
             check('CET4 filter', len(api(port, '/api/papers?exam=cet4')['papers']) == 46)
@@ -245,5 +245,5 @@ if __name__ == '__main__':
         raise TimeoutError('macOS package verification exceeded five minutes')
     signal.signal(signal.SIGALRM, deadline)
     signal.alarm(300)
-    archive = Path(__file__).resolve().parents[1] / f'release-assets/CET-Practice-v1.2.0-macOS-{args.arch}.zip'
+    archive = Path(__file__).resolve().parents[1] / f'release-assets/CET-Practice-v1.3.0-macOS-{args.arch}.zip'
     run(archive, args.arch)

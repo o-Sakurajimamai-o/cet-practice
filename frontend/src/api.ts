@@ -54,3 +54,5 @@ export const historyList = () => api('/api/history')
 export const reportApi = (exam?: string) => api(`/api/report${exam ? `?exam=${encodeURIComponent(exam)}` : ''}`)
 export const backupImport = (data: object, merge: boolean) =>
   api(`/api/backup/import?merge=${merge}`, { method: 'POST', body: JSON.stringify({ data }) })
+export const allMarks = (exam?: 'cet4' | 'cet6') => api(`/api/marks/all${exam ? `?exam=${encodeURIComponent(exam)}` : ''}`)
+export const deleteMark = (id: string) => api(`/api/marks/${encodeURIComponent(id)}`, { method: 'DELETE' })

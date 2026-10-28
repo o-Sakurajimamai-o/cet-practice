@@ -6,7 +6,7 @@ import urllib.error, urllib.request
 
 BASE=Path(__file__).resolve().parents[1]
 STAGE=BASE
-zip_path=BASE/'release-assets/CET-Practice-v1.2.0-Windows-x64.zip'
+zip_path=BASE/'release-assets/CET-Practice-v1.3.0-Windows-x64.zip'
 unpacked=Path(tempfile.mkdtemp(prefix='CET ZIP 验证 '))
 with zipfile.ZipFile(zip_path) as archive:
     archive.extractall(unpacked)

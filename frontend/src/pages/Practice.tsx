@@ -7,6 +7,7 @@ import {
 import AudioPlayer from '../components/AudioPlayer'
 import MaterialPanel from '../components/MaterialPanel'
 import MarkableMaterial from '../components/MarkableMaterial'
+import { parseReadingTranslation } from '../readingTranslation'
 import QuestionCard from '../components/QuestionCard'
 import Icon from '../components/Icon'
 import ThemeToggle from '../components/ThemeToggle'
@@ -40,6 +41,9 @@ export default function Practice() {
   const [restarting, setRestarting] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
+  const navigationRef = useRef<HTMLElement>(null)
+  const [layout, setLayout] = useState({ rail: false, columns: false })
+  const [expandedTranslation, setExpandedTranslation] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const loaded = useRef(false)
   const mounted = useRef(true)
@@ -53,6 +57,9 @@ export default function Practice() {
   const sectionPositions = useRef<Record<string, string>>({})
   const pendingReveals = useRef(new Set<Promise<any>>())
   const submitted = !!data?.session?.submitted_at
+  const translationPaper = data?.questions.find((q: any) => q.uid === currentUid)?.paper_key || data?.paper?.paper_key || ''
+  const translationScope = `${translationPaper}:${activeSection}`
+  const readingTranslationOpen = submitted && ['reading1', 'reading2'].includes(activeSection) && expandedTranslation === translationScope
 
   useEffect(() => {
     mounted.current = true
@@ -338,16 +345,66 @@ export default function Practice() {
     return () => observer.disconnect()
   }, [!!data])
 
+  // Measure the unreserved page width, so adding the rail cannot trigger a resize loop.
   useLayoutEffect(() => {
     const page = pageRef.current
-    const nav = page?.querySelector<HTMLElement>('.qnav-card')
-    if (!page || !nav) return
-    const measure = () => page.style.setProperty('--question-nav-height', `${Math.ceil(nav.getBoundingClientRect().height)}px`)
+    if (!page) return
+    const measure = () => {
+      const rect = page.getBoundingClientRect()
+      const width = rect.width
+      const railWidth = parseFloat(getComputedStyle(page).getPropertyValue('--practice-rail-width'))
+      const minimumColumns = (420 + 440) * Math.max(1, fontScale) + 24
+      const minimumRail = minimumColumns + railWidth + 24
+      page.style.setProperty('--practice-rail-left', `${rect.right - railWidth}px`)
+      const outerGutter = Math.min(rect.left, document.documentElement.clientWidth - rect.right)
+      page.style.setProperty('--practice-switch-inset', `${Math.max(12, Math.round((outerGutter - 52) / 2))}px`)
+      const tabs = toolbarRef.current?.querySelector<HTMLElement>('.section-tabs')
+      const activeTab = tabs?.querySelector<HTMLElement>('.active')
+      if (tabs && activeTab) {
+        const strip = tabs.getBoundingClientRect(), tab = activeTab.getBoundingClientRect()
+        if (tab.left < strip.left) tabs.scrollLeft -= strip.left - tab.left
+        else if (tab.right > strip.right) tabs.scrollLeft += tab.right - strip.right
+      }
+      setLayout(previous => {
+        // A 32px entry margin avoids flicker around the rail threshold.
+        const rail = width >= minimumRail + (previous.rail ? 0 : 32)
+        const columns = rail || width >= minimumColumns + (previous.columns ? 0 : 24)
+        return rail === previous.rail && columns === previous.columns ? previous : { rail, columns }
+      })
+    }
     measure()
     const observer = new ResizeObserver(measure)
-    observer.observe(nav)
+    observer.observe(page)
+    window.addEventListener('resize', measure)
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
+  }, [!!data, fontScale])
+
+  useLayoutEffect(() => {
+    const page = pageRef.current, navigation = navigationRef.current
+    if (!page || !navigation) return
+    const measure = () => page.style.setProperty('--question-nav-height', layout.rail ? '0px' : `${Math.ceil(navigation.getBoundingClientRect().height)}px`)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(navigation)
     return () => observer.disconnect()
-  }, [!!data, activeSection])
+  }, [!!data, layout.rail, activeSection])
+
+  useLayoutEffect(() => {
+    const list = navigationRef.current?.querySelector<HTMLElement>('.qnav')
+    if (!list) return
+    const keepCurrentVisible = () => {
+      const button = list.querySelector<HTMLElement>('[aria-current="true"]')
+      if (!button) return
+      // Scroll only the navigator, leaving the passage and page position unchanged.
+      const bounds = list.getBoundingClientRect(), target = button.getBoundingClientRect()
+      if (target.top < bounds.top + 5) list.scrollTop -= bounds.top + 5 - target.top
+      else if (target.bottom > bounds.bottom - 5) list.scrollTop += target.bottom - bounds.bottom + 5
+    }
+    keepCurrentVisible()
+    const observer = new ResizeObserver(keepCurrentVisible)
+    observer.observe(list)
+    return () => observer.disconnect()
+  }, [currentUid, activeSection, layout.rail, layout.columns, fontScale])
 
   if (err) return <div className="empty-state card"><Icon name="alert" size={32}/><h3>练习加载失败</h3><p>{err}</p><button onClick={() => nav('/')}>返回试卷库</button></div>
   if (!data) return <div className="loading" role="status"><span className="spinner"/>正在加载试卷…</div>
@@ -362,6 +419,8 @@ export default function Practice() {
   const sections = data.sections_by_paper?.[materialPaper] || data.sections || {}
   const audio_url = data.audio_by_paper ? data.audio_by_paper[materialPaper] : data.audio_url
   const mat = sections[activeSection]?.main || Object.values(sections[activeSection] || {})[0]
+  const readingTranslation = submitted && ['reading1', 'reading2'].includes(activeSection)
+    ? parseReadingTranslation(mat?.translation?.passage_translation) : []
   const wordBank = mat?.content?.word_bank || []
   const paragraphLabels = (mat?.content?.paragraphs || []).map((p: any) => p.label)
   const wordAnswer: Record<number, string> = {}
@@ -387,7 +446,7 @@ export default function Practice() {
                 return (
                   <button key={q.uid} className={cls} aria-label={`第 ${q.q_no} 题`} aria-current={q.uid === currentUid ? 'true' : undefined}
                     disabled={busyNow}
-                    onClick={(e) => { focusQuestion(q, true); e.currentTarget.closest('details')?.removeAttribute('open') }}
+                    onClick={() => focusQuestion(q, true)}
                   >{q.q_no}</button>
                 )
               })
@@ -402,14 +461,14 @@ export default function Practice() {
     focusQuestion(bySection[section].find(q => q.uid === sectionPositions.current[section]) || bySection[section][0])
     if (submitted) requestAnimationFrame(() => {
       const split = pageRef.current?.querySelector('.split')
-      if (split) window.scrollTo({ top: Math.max(0, window.scrollY + split.getBoundingClientRect().top - (toolbarRef.current?.offsetHeight || 0) - 8), behavior: 'instant' })
+      if (split) window.scrollTo({ top: Math.max(0, window.scrollY + split.getBoundingClientRect().top - (toolbarRef.current?.offsetHeight || 0) - (layout.rail ? 0 : navigationRef.current?.offsetHeight || 0) - 16), behavior: 'instant' })
     })
     else window.scrollTo({ top: 0, behavior: 'instant' })
     pageRef.current?.querySelector('.material')?.scrollTo({ top: 0 })
   }
 
   return (
-    <div className="practice-page" ref={pageRef}>
+    <div className="practice-page" ref={pageRef} data-nav-layout={layout.rail ? 'rail' : 'top'} data-columns={layout.columns ? 'double' : 'single'}>
       <div className="practice-toolbar" ref={toolbarRef}>
         <div className="practice-head">
           <button className="icon-btn back-btn" aria-label="返回试卷库" title="返回试卷库" disabled={busyNow} onClick={async () => { try { refreshClock(); await persist(true); nav('/') } catch { /* Keep unsaved answers visible. */ } }}><Icon name="back" size={19}/></button>
@@ -495,15 +554,24 @@ export default function Practice() {
         </div>
       )}
 
-      {submitted && result && <ResultHero result={result} />}
-
-      <div className="section-side-switch" aria-label="切换题型">
-        {[-1, 1].map(delta => { const target = availableSections[currentSectionIndex + delta]; return <button key={delta} className={delta < 0 ? 'previous' : 'next'} disabled={!target || busyNow} aria-label={target ? `${delta < 0 ? '上一部分' : '下一部分'}：${SECTION_CN[target]}` : (delta < 0 ? '没有上一部分' : '没有下一部分')} title={target ? SECTION_CN[target] : ''} onClick={() => target && goSection(target)}><span aria-hidden="true">{delta < 0 ? '‹' : '›'}</span><small>{target ? SECTION_CN[target] : '已到底'}</small></button> })}
+      <aside className="practice-navigation" ref={navigationRef} aria-label="练习导航">
+        <div className="qnav-card">
+          <div className="qnav-head"><span>题号导航</span><span className="qnav-count">{visibleQuestions.length} 题</span></div>
+          <div className="qnav-legend">
+            {submitted ? <><span><i className="lg correct"/>正确</span><span><i className="lg wrong"/>错误</span></> : <><span><i className="lg answered"/>已答</span><span><i className="lg"/>未答</span></>}<span><i className="lg fav"/>收藏</span>
+          </div>
+          <div className="qnav">{questionButtons}</div>
+        </div>
+      </aside>
+      <div className="section-side-switch" role="group" aria-label="切换题型">
+          {[-1, 1].map(delta => {
+            const target = availableSections[currentSectionIndex + delta]
+            const label = target ? `${delta < 0 ? '上一部分' : '下一部分'}：${SECTION_CN[target]}` : (delta < 0 ? '没有上一部分' : '没有下一部分')
+            return <button key={delta} className={delta < 0 ? 'previous' : 'next'} disabled={!target || busyNow} aria-label={label} title={label} onClick={() => target && goSection(target)}><Icon name="chevron" size={26}/></button>
+          })}
       </div>
-      <details className="mobile-qnav">
-        <summary>题号导航</summary>
-        <div className="mobile-qnav-panel"><div className="qnav-head">题号导航</div><div className="qnav">{questionButtons}</div></div>
-      </details>
+      <div className="practice-content">
+      {submitted && result && <ResultHero result={result} />}
       <MarkableMaterial key={`${materialPaper}:${activeSection}`} paper={materialPaper} section={activeSection}>
       <div className="split">
         <div className="material">
@@ -520,9 +588,18 @@ export default function Practice() {
             }}
             wordAnswer={wordAnswer}
             showTranscript={submitted}
+            showReadingTranslation={readingTranslationOpen}
+            readingTranslation={readingTranslation}
           />
         </div>
         <div className="questions-col">
+          {submitted && ['reading1', 'reading2'].includes(activeSection) && <div className="reading-translation-control card">
+            <div><b>阅读模式 · {readingTranslationOpen ? '中英对照' : '仅原文'}</b><span className="hint">{readingTranslation.length ? '每个英文自然段下方显示对应中文' : '本篇译文暂不可用，可对照原解析 PDF'}</span></div>
+            <button disabled={!readingTranslation.length} aria-pressed={readingTranslationOpen} aria-controls="reading-passage"
+              onClick={() => setExpandedTranslation(readingTranslationOpen ? null : translationScope)}>
+              <Icon name="text" size={16}/>{readingTranslationOpen ? '切换为仅原文' : '切换为中英对照'}
+            </button>
+          </div>}
           {sectionPapers.length > 1 && <div className="redo-paper-switch">
             <label>当前试卷 <select aria-label="切换重做试卷" value={materialPaper} disabled={busyNow}
               onChange={e => focusQuestion(secQuestions.find((q: any) => q.paper_key === e.target.value))}>
@@ -530,15 +607,6 @@ export default function Practice() {
             </select></label>
             <span className="muted small">题目与左侧材料按试卷一起切换。</span>
           </div>}
-          <div className="qnav-card sticky-qnav">
-            <div className="qnav-head"><span>题号导航</span><span className="qnav-legend">
-              {submitted ? <><i className="lg correct"/>正确<i className="lg wrong"/>错误</> : <><i className="lg answered"/>已答<i className="lg"/>未答</>}<i className="lg fav"/>收藏
-            </span></div>
-            <div className="qnav">
-              {questionButtons}
-            </div>
-          </div>
-
           {visibleQuestions.map((q: any, index: number) => {
             const group = activeSection === 'listening' ? (mat?.content?.groups || []).find((g: any) => g.key === q.group_key || (q.q_no >= g.from && q.q_no <= g.to)) : null
             const previous = visibleQuestions[index - 1]
@@ -577,6 +645,7 @@ export default function Practice() {
         </div>
       </div>
       </MarkableMaterial>
+      </div>
     </div>
   )
 }

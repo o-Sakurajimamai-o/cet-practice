@@ -5,7 +5,7 @@ from pathlib import Path
 from fetch_release_data import verify_seed
 
 PROJECT = Path(__file__).resolve().parents[1]
-archive = PROJECT / 'build-input/CET-Practice-v1.2.0-clean-build-seed.zip'
+archive = PROJECT / 'build-input/CET-Practice-v1.3.0-clean-build-seed.zip'
 released = PROJECT / 'build-input/CET-Practice-v1.2.0-Windows-x64.zip'
 if archive.exists():
     with archive.open('rb') as f:

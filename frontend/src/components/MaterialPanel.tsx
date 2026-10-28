@@ -1,12 +1,14 @@
 import { Fragment } from 'react'
 import { SubjectivePrompt } from './PdfProse'
+import PdfProse from './PdfProse'
+import type { ReadingTranslationParagraph } from '../readingTranslation'
 import Icon from './Icon'
 import readingParagraphs from '../readingParagraphs.json'
 
 /** 左侧材料面板：按题型渲染共享材料（文章/词库/段落/写作翻译题面）。 */
 export default function MaterialPanel({
   section, mat, selectedBlank, onBlankClick, paperKey,
-  wordAnswer, showTranscript, disabled = false, availableBlanks,
+  wordAnswer, showTranscript, disabled = false, availableBlanks, showReadingTranslation = false, readingTranslation = [],
 }: {
   section: string
   paperKey?: string
@@ -17,6 +19,8 @@ export default function MaterialPanel({
   showTranscript: boolean
   disabled?: boolean
   availableBlanks?: number[]
+  showReadingTranslation?: boolean
+  readingTranslation?: ReadingTranslationParagraph[]
 }) {
   if (!mat) return <div className="card material-card muted">该题型无共享材料。</div>
   const c = mat.content || {}
@@ -121,7 +125,14 @@ export default function MaterialPanel({
         <div className="material-head"><Icon name="book" size={16}/>仔细阅读{section === 'reading1' ? ' · Passage One' : ' · Passage Two'}</div>
         {mat.directions && <div className="directions">{mat.directions}</div>}
         {instruction && <div className="reading-instruction">{instruction}</div>}
-        <div className="passage">{paragraphs.map((p: string, i: number) => <p className="reading-paragraph" key={i}>{p}</p>)}</div>
+        <div className={`passage${showReadingTranslation ? ' bilingual-passage' : ''}`} id="reading-passage">
+          {paragraphs.map((p: string, i: number) => <div className="reading-paragraph-pair" key={i}>
+            <p className="reading-paragraph">{p}</p>
+            {showReadingTranslation && readingTranslation[i] && <div className="reading-paragraph-cn" lang="zh-CN" data-mark-skip data-mark-index={600 + readingTranslation[i].number}>
+              <PdfProse text={readingTranslation[i].text}/>
+            </div>}
+          </div>)}
+        </div>
         {c.passage2 && (
           <>
             <div className="sec-divider">Passage Two</div>

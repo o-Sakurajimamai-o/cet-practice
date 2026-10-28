@@ -33,6 +33,17 @@ FRONTEND_DIST = Path(os.environ.get("CET6_FRONTEND_DIST", PROJECT / "frontend" /
 app = FastAPI(title="四六级研习室", docs_url=None, redoc_url=None)
 
 
+@app.middleware("http")
+async def add_no_cache_for_html(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith(".html") or not "." in path.split("/")[-1]:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError):
     # Non-finite numeric input must remain a 422, not break JSON error serialization.
@@ -842,6 +853,25 @@ def get_marks(paper_key: str, section: str):
         conn.close()
 
 
+@app.get("/api/marks/all")
+def all_marks(exam: Literal["cet4", "cet6"] | None = None):
+    """复习空间：全部标记连同试卷信息，最新在前；试卷缺失的标记也保留。"""
+    conn = db.connect()
+    try:
+        # Orphan marks have no paper row, so the exam falls back to the paper_key prefix.
+        exam_sql = "COALESCE(p.exam_type, CASE WHEN t.paper_key LIKE 'cet4-%' THEN 'cet4' ELSE 'cet6' END)"
+        sql = (f"SELECT t.*, {exam_sql} AS exam_type, p.year, p.month, p.set_no, p.id IS NULL AS paper_missing "
+               "FROM text_marks t LEFT JOIN papers p ON p.paper_key=t.paper_key")
+        args: list[Any] = []
+        if exam:
+            sql += f" WHERE {exam_sql}=?"; args.append(exam)
+        rows = conn.execute(sql + " ORDER BY t.created_at DESC, t.rowid DESC", args).fetchall()
+        return {"marks": [{**dict(r), "paper_missing": bool(r["paper_missing"]),
+                           "section_cn": SECTION_CN.get(r["section"], r["section"])} for r in rows]}
+    finally:
+        conn.close()
+
+
 @app.post("/api/marks")
 def add_mark(body: TextMark):
     conn = db.connect()
@@ -1309,7 +1339,7 @@ def startup():
 
 @app.get("/api/health")
 def local_health():
-    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.2.0"}
+    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.3.0"}
 
 @app.post("/api/local/shutdown")
 def local_shutdown(request: Request):
