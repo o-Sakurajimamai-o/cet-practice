@@ -95,7 +95,7 @@ jobs:
       - name: Upload and verify release assets
         run: |
           python3 - <<'PY'
-          import hashlib,json,os,subprocess
+          import hashlib,json,os,subprocess,urllib.parse
           from pathlib import Path
           base='repos/'+os.environ['GH_REPO']; ep=base+'/releases/'+os.environ['RELEASE_ID']
           def get(path):return json.loads(subprocess.check_output(['gh','api',path]))
@@ -108,7 +108,12 @@ jobs:
             asset=next((a for a in get(ep)['assets'] if a['name']==path.name),None)
             if asset and asset['size']==path.stat().st_size and asset.get('digest')==digest:continue
             if asset:subprocess.run(['gh','api','--method','DELETE',base+'/releases/assets/'+str(asset['id'])],check=True)
-            subprocess.run(['gh','release','upload','v1.4.0',str(path)],check=True)
+            result=subprocess.run(['gh','release','upload','v1.4.0',str(path)])
+            if result.returncode:
+              # The GitHub CLI may not resolve draft tags, although the release ID is accessible.
+              url=release['upload_url'].split('{')[0]+'?name='+urllib.parse.quote(path.name)
+              subprocess.run(['gh','api','--method','POST',url,'-H','Content-Type: application/octet-stream',
+                              '--input',str(path)],check=True,stdout=subprocess.DEVNULL)
           release=get(ep)
           for path in paths:
             asset=next(a for a in release['assets'] if a['name']==path.name)
