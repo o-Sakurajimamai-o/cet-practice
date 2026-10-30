@@ -1,0 +1,134 @@
+name: Publish verified v1.4.0
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful six-platform build run ID
+        required: true
+      source_sha:
+        description: Exact tested source commit
+        required: true
+      release_id:
+        description: Existing draft release ID
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ inputs.run_id }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      RELEASE_ID: ${{ inputs.release_id }}
+    steps:
+      - name: Verify successful build and exact source
+        run: |
+          python3 - <<'PY'
+          import json,os,re,subprocess
+          base='repos/'+os.environ['GH_REPO']
+          assert re.fullmatch(r'[0-9]+',os.environ['RUN_ID']) and re.fullmatch(r'[0-9]+',os.environ['RELEASE_ID'])
+          assert re.fullmatch(r'[0-9a-f]{40}',os.environ['SOURCE_SHA'])
+          def get(path): return json.loads(subprocess.check_output(['gh','api',path]))
+          run=get(base+'/actions/runs/'+os.environ['RUN_ID'])
+          assert run['head_sha']==os.environ['SOURCE_SHA'] and run['conclusion']=='success'
+          assert run['name']=='Build and verify v1.4.0' and run['head_branch']=='release-v1.4.0-build'
+          jobs=get(base+'/actions/runs/'+os.environ['RUN_ID']+'/jobs?per_page=100')['jobs']
+          assert len(jobs)==6 and all(j['conclusion']=='success' for j in jobs)
+          assert get(base+'/commits/main')['sha']==os.environ['SOURCE_SHA']
+          release=get(base+'/releases/'+os.environ['RELEASE_ID'])
+          assert release['draft'] and release['tag_name']=='v1.4.0'
+          PY
+      - name: Download six verified builds
+        run: |
+          for platform in Windows-x64 macOS-arm64 macOS-x86_64; do
+            for edition in NoAudio WithAudio; do
+              name="$platform-$edition"
+              gh run download "$RUN_ID" -n "$name" -D "assets/$name"
+            done
+          done
+      - name: Recheck build reports, hashes and size; write release notes
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,shutil
+          from pathlib import Path
+          out=Path('release');out.mkdir(); manifest=[];reports={}
+          for platform in ['Windows-x64','macOS-arm64','macOS-x86_64']:
+            for edition in ['NoAudio','WithAudio']:
+              name=f'{platform}-{edition}';p=Path('assets')/name
+              report=json.loads((p/f'verification-{name}.json').read_text())
+              build=json.loads((p/f'build-{name}.json').read_text())
+              assert report['passed'] and report['platform']==platform and report['edition']==edition
+              for item in ['kaoyan question rendered','kaoyan PDF download link','Linux Do link on page',
+                           'answer survives restart','legacy progress retained','legacy custom analysis retained',
+                           'legacy gains kaoyan papers','upgrade backup created']:
+                assert item in report['checks'],(name,item)
+              assert ('no-audio edition explains absence' if edition=='NoAudio' else 'browser can seek audio') in report['checks']
+              archive=p/f'CET-Practice-v1.4.0-{name}.zip'
+              with archive.open('rb') as f:digest=hashlib.file_digest(f,'sha256').hexdigest()
+              assert digest==build['sha256'] and archive.stat().st_size==build['bytes']<2*1024**3
+              shutil.copy2(archive,out/archive.name)
+              manifest.append({'name':archive.name,'bytes':archive.stat().st_size,'sha256':digest})
+              reports[name]=len(report['checks'])
+          (out/'SHA256SUMS.txt').write_text(''.join(f"{a['sha256']}  {a['name']}\n" for a in manifest),encoding='utf8')
+          (out/'manifest.json').write_text(json.dumps({'source_sha':os.environ['SOURCE_SHA'],'build_run':os.environ['RUN_ID'],'assets':manifest,'checks':reports},indent=2),encoding='utf8')
+          notes='''英语研习室 v1.4.0：新增考研英语历年真题，支持 Windows 和 macOS。
+
+          - 新增考研英语试卷、作答和解析，整卷 PDF 可在练习页联网下载。
+          - 支持考研、四级、六级切换，保留错题、收藏、笔记、划词统计及练习进度。
+          - 每个平台提供 `WithAudio`（附带四六级听力）和 `NoAudio`（无音频，保留听力题目及解析）两版。
+
+          Windows 下载 `Windows-x64`；Mac M 系列下载 `macOS-arm64`，Intel 选择 `macOS-x86_64`。完整解压后启动，无需安装 Python 或 Node.js。Mac 要求 macOS 14 及以上，应用未经过 Apple 公证，首次打开请参考仓库中的 Mac 使用说明。
+
+          Windows 升级请解压到新目录，再通过「备份与恢复」迁移记录。Mac 替换应用前请先备份；原记录位于 `~/Library/Application Support/CET-Practice/data`。四六级原 PDF 可选用 v1.1.0 Optional-PDF 补充包。
+
+          发布题库不包含个人练习记录；第三方参考答案可能存在来源分歧。感谢 [Linux Do 社区](https://linux.do/)。
+          '''
+          notes='\n'.join(line[10:] if line.startswith(' '*10) else line for line in notes.splitlines())
+          notes+='\n各平台验证通过：'+', '.join(f'{n} {count} 项' for n,count in reports.items())+'。\n\n附件大小：\n'
+          notes+=''.join(f"- {a['name']}：{a['bytes']/1024**2:.2f} MiB\n" for a in manifest)
+          (out/'release-notes.md').write_text(notes,encoding='utf8')
+          PY
+      - name: Upload and verify release assets
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          base='repos/'+os.environ['GH_REPO']; ep=base+'/releases/'+os.environ['RELEASE_ID']
+          def get(path):return json.loads(subprocess.check_output(['gh','api',path]))
+          def patch(data):subprocess.run(['gh','api','--method','PATCH',ep,'--input','-'],input=json.dumps(data),text=True,check=True,stdout=subprocess.DEVNULL)
+          release=get(ep);assert release['draft'] and release['tag_name']=='v1.4.0'
+          patch({'target_commitish':os.environ['SOURCE_SHA']})
+          paths=[*sorted(Path('release').glob('*.zip')),Path('release/SHA256SUMS.txt')]
+          for path in paths:
+            digest='sha256:'+hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
+            asset=next((a for a in get(ep)['assets'] if a['name']==path.name),None)
+            if asset and asset['size']==path.stat().st_size and asset.get('digest')==digest:continue
+            if asset:subprocess.run(['gh','api','--method','DELETE',base+'/releases/assets/'+str(asset['id'])],check=True)
+            subprocess.run(['gh','release','upload','v1.4.0',str(path)],check=True)
+          release=get(ep)
+          for path in paths:
+            asset=next(a for a in release['assets'] if a['name']==path.name)
+            assert asset['size']==path.stat().st_size and asset['digest']=='sha256:'+hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
+          seed=next((a for a in release['assets'] if a['name']=='CET-Practice-v1.4.0-clean-build-seed.zip'),None)
+          if seed:
+            assert seed['digest']=='sha256:057353d6c5a217732dadef5968ce70faff5e8b55af28db4bbf5dba431203e277'
+            subprocess.run(['gh','api','--method','DELETE',base+'/releases/assets/'+str(seed['id'])],check=True)
+          assert {a['name'] for a in get(ep)['assets']}=={p.name for p in paths}
+          patch({'draft':False,'make_latest':'true','body':Path('release/release-notes.md').read_text(encoding='utf8')})
+          print('Published v1.4.0 after asset SHA-256 verification')
+          PY
+      - name: Keep publication evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: v1.4.0-publication-evidence
+          path: |
+            release/*.json
+            release/*.txt
+            release/*.md
+          retention-days: 30
+          if-no-files-found: warn
