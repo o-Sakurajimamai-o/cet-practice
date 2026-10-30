@@ -4,6 +4,22 @@ import { wrongBook, favoritesList, historyList, createRedo, allMarks, deleteMark
 import QuestionDetailModal from '../components/QuestionDetailModal'
 import Icon from '../components/Icon'
 import { KIND_CN, exportFileName, filterMarks, formatTime, groupMarks, keyOf, kind, locationLabel, markItems, markStats, marksCsv, paperLabel, sectionLabel, vocabularyText, type Bucket } from '../markStats'
+import { EXAM_NAME, examOf, groupLabel, paperTitle, readExam, saveExam, sectionLabel as sectionName, type Exam } from '../exam'
+
+const EXAM_SWITCH: [Exam, string][] = [['cet4', '英语四级 CET-4'], ['cet6', '英语六级 CET-6'], ['kaoyan', '考研英语']]
+// CET rows have no exam_type and keep their original look (raw paper key, API label, listening placeholder);
+// kaoyan rows name the paper and the part, and use the API preview because many kaoyan stems are placeholders.
+const isKaoyan = (row: any) => examOf(row) === 'kaoyan'
+// CONTRACT §6.4: a kaoyan preview is one line, so the writing prompt's "---" quote separators never show.
+const oneLine = (text: string) => text.replace(/\s*-{3,}\s*/g, ' ').replace(/\s+/g, ' ').trim()
+const itemText = (row: any, cetFallback: string) => isKaoyan(row) ? oneLine(String(row.preview || row.stem || '')) || '（题干在材料中，点击查看）' : row.stem || cetFallback
+const paperName = (row: any) => isKaoyan(row) ? paperTitle(row) : row.paper_key
+const partName = (row: any) => isKaoyan(row)
+  ? [sectionName(row.section, 'kaoyan', row.variant), row.section === 'reading1' ? groupLabel(row.section, row.group_key) : ''].filter(Boolean).join(' · ')
+  : row.section_cn
+// Shared Part B options are whole paragraphs or statements; only T/F choices are short enough to preview.
+const showOptions = (row: any) => row.options?.length > 0 && (!isKaoyan(row) || row.section !== 'matching' || row.variant === 'tf')
+const SCORE_RULE = '客观题参考分：完形每题 0.5 分，阅读理解与新题型每题 2 分，满分 60（不含翻译和写作）；只计 2005 年起的整卷练习'
 
 // Clipboard API needs a secure context; the textarea fallback covers plain http on a LAN address.
 async function copyText(text: string) {
@@ -66,8 +82,9 @@ export default function Review() {
   const [detailUid, setDetailUid] = useState<string | null>(null)
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [exam, setExam] = useState(() => localStorage.getItem('cet-exam') === 'cet4' ? 'cet4' : 'cet6')
-  const belongs = (row: any) => String(row.paper_key || row.uid || '').startsWith('cet4-') === (exam === 'cet4')
+  const [exam, setExam] = useState<Exam>(() => readExam())
+  // Rows from the API: kaoyan rows carry exam_type, CET rows are classified by their key prefix.
+  const belongs = (row: any) => examOf(row) === exam
   const favsShown = favs.filter(belongs), histShown = hist.filter(belongs), wrongInExam = wrong?.filter(belongs)
   const marksShown = useMemo(() => marks?.filter(belongs), [marks, exam])
   const marksFiltered = useMemo(() => filterMarks(marksShown || [], markQuery), [marksShown, markQuery])
@@ -153,7 +170,7 @@ export default function Review() {
         <h1>复习空间</h1>
         <p>重访每一个疑问，让做过的题真正成为自己的积累。</p>
       </header>
-      <div className="exam-switch-row"><h2>{exam === 'cet4' ? '英语四级' : '英语六级'}</h2><div className="segmented" role="group" aria-label="考试类型">{[['cet4', '英语四级 CET-4'], ['cet6', '英语六级 CET-6']].map(([value, label]) => <button key={value} className={exam === value ? 'active' : ''} aria-pressed={exam === value} onClick={() => { setExam(value); localStorage.setItem('cet-exam', value) }}>{label}</button>)}</div></div>
+      <div className="exam-switch-row"><h2>{EXAM_NAME[exam]}</h2><div className="segmented" role="group" aria-label="考试类型">{EXAM_SWITCH.map(([value, label]) => <button key={value} className={exam === value ? 'active' : ''} aria-pressed={exam === value} onClick={() => { setExam(value); saveExam(value) }}>{label}</button>)}</div></div>
       <div className="review-summary">
         <div className="mini-stat danger"><Icon name="target" size={18}/><div><b>{unresolved ?? '…'}</b><span>未掌握错题</span></div></div>
         <div className="mini-stat amber"><Icon name="star" size={18}/><div><b>{favsShown.length}</b><span>收藏题目</span></div></div>
@@ -188,13 +205,13 @@ export default function Review() {
                   <div className="item-body">
                     <button className="item-title" onClick={() => setDetailUid(w.uid)}>
                       <span className="qno sm">{w.q_no}</span>
-                      <span className="clamp">{w.stem || '（听力题，题干由录音念出；点击查看材料）'}</span>
+                      <span className="clamp">{itemText(w, '（听力题，题干由录音念出；点击查看材料）')}</span>
                     </button>
-                    {w.options?.length > 0 && <div className="item-options">
+                    {showOptions(w) && <div className="item-options">
                       {w.options.slice(0, 4).map((o: any) => <span key={o.key}><b>{o.key}</b>{o.text?.slice(0, 40)}</span>)}
                     </div>}
                     <div className="item-meta">
-                      <span>{w.paper_key}</span><span>{w.section_cn}</span><span>错 {w.wrong_count} 次</span><span>最近 {w.last_wrong_at}</span>
+                      <span>{paperName(w)}</span><span>{partName(w)}</span><span>错 {w.wrong_count} 次</span><span>最近 {w.last_wrong_at}</span>
                     </div>
                   </div>
                   <span className={`status-pill ${w.resolved ? 'done' : 'wrong'}`}>{w.resolved ? '已掌握' : '未掌握'}</span>
@@ -213,9 +230,9 @@ export default function Review() {
               <span className="fav-mark"><Icon name="starFilled" size={18}/></span>
               <div className="item-body">
                 <button className="item-title" onClick={() => setDetailUid(f.uid)}>
-                  <span className="qno sm">{f.q_no}</span><span className="clamp">{f.stem || '（听力题）'}</span>
+                  <span className="qno sm">{f.q_no}</span><span className="clamp">{itemText(f, '（听力题）')}</span>
                 </button>
-                <div className="item-meta"><span>{f.paper_key}</span><span>{f.section_cn}</span><span>收藏于 {f.created_at}</span></div>
+                <div className="item-meta"><span>{paperName(f)}</span><span>{partName(f)}</span><span>收藏于 {f.created_at}</span></div>
               </div>
               <button className="ghost" onClick={() => setDetailUid(f.uid)}>查看</button>
             </li>
@@ -226,20 +243,21 @@ export default function Review() {
 
       {tab === 'history' && (
         <div className="table-wrap"><table className="list">
-          <thead><tr><th>交卷时间</th><th>试卷</th><th>模式</th><th>正确</th><th>错误</th><th>正确率</th><th aria-label="操作"></th></tr></thead>
+          <thead><tr><th>交卷时间</th><th>试卷</th><th>模式</th><th>正确</th><th>错误</th><th>正确率</th>{exam === 'kaoyan' && <th title={SCORE_RULE}>参考分</th>}<th aria-label="操作"></th></tr></thead>
           <tbody>
             {histShown.map((h) => (
               <tr key={h.id}>
                 <td className="nowrap">{h.submitted_at}</td>
-                <td className="nowrap"><b>{h.paper_key}</b></td>
+                <td className="nowrap"><b>{paperName(h)}</b></td>
                 <td><span className="tag">{h.mode === 'full' ? '整卷' : '重做'}</span></td>
                 <td className="num ok-text">{h.correct}</td>
                 <td className="num bad-text">{h.wrong}</td>
                 <td>{h.accuracy != null ? <div className="acc"><div className="progress-track"><span style={{ width: `${h.accuracy * 100}%` }}/></div><span>{(h.accuracy * 100).toFixed(1)}%</span></div> : '—'}</td>
+                {exam === 'kaoyan' && <td className="num nowrap">{h.score?.total ? <span title={SCORE_RULE}><b>{h.score.earned}</b> / {h.score.total}</span> : <span className="muted" title="只有 2005 年起的整卷练习计算参考分；其余只看正确率">—</span>}</td>}
                 <td><button className="ghost sm" onClick={() => nav(`/practice/${h.id}`)}>查看<Icon name="chevron" size={14}/></button></td>
               </tr>
             ))}
-            {!histShown.length && <tr><td colSpan={7}><div className="empty-state"><Icon name="clock" size={32}/><h3>暂无已完成练习</h3><p>交卷后的练习会记录在这里。</p></div></td></tr>}
+            {!histShown.length && <tr><td colSpan={exam === 'kaoyan' ? 8 : 7}><div className="empty-state"><Icon name="clock" size={32}/><h3>暂无已完成练习</h3><p>交卷后的练习会记录在这里。</p></div></td></tr>}
           </tbody>
         </table></div>
       )}
@@ -297,7 +315,7 @@ export default function Review() {
                       <MarkText text={text} className={kind(m.text)}/>
                       <div className="mark-tags">
                         {markGroup === 'section' ? <span className="tag">{paperLabel(m)}</span> : <span className="tag info">{sectionLabel(m)}</span>}
-                        <span className="tag">{locationLabel(m.passage_index)}</span>
+                        <span className="tag">{locationLabel(m.passage_index, m)}</span>
                         <span className="tag">{KIND_CN[kind(m.text)]}</span>
                         {count > 1 && <span className="tag warn">已标记 {count} 次</span>}
                         {m.paper_missing && <span className="tag err">试卷已不在题库</span>}

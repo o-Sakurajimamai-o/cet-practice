@@ -144,6 +144,18 @@ CREATE TABLE IF NOT EXISTS manual_fixes (
     created_at TEXT DEFAULT (datetime('now','localtime')),
     UNIQUE(uid, field)
 );
+-- 答案核验（题库元数据，不进备份）：由 scripts/kaoyan_answer_checks.py 写入，接口只读。
+CREATE TABLE IF NOT EXISTS answer_checks (
+    uid TEXT PRIMARY KEY,            -- questions.uid（目前只有考研客观题）
+    status TEXT NOT NULL,            -- external_agree / disputed_resolved / disputed_unresolved / source_only
+    basis TEXT,                      -- external_agree 时最强的比对方式：text / printed_options / letter
+    answer TEXT,                     -- 核对时题库中的答案字母；与当前 answer 不同即视为过期
+    summary TEXT NOT NULL,           -- 一句中文结论，界面直接显示
+    detail_json TEXT NOT NULL DEFAULT '{}',
+    source_version TEXT NOT NULL     -- 合并脚本版本 + 证据登记表 sha256
+);
+-- 与 scripts/import_kaoyan_canonical.py 的建表语句完全相同：后端读取其 source_url，全新安装也需要这张表。
+CREATE TABLE IF NOT EXISTS kaoyan_canonical (paper_id INTEGER PRIMARY KEY REFERENCES papers(id), source_slug TEXT UNIQUE NOT NULL, category TEXT NOT NULL, source_url TEXT NOT NULL, sha256 TEXT NOT NULL, document_json TEXT NOT NULL);
 """
 
 

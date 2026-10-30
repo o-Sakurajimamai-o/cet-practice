@@ -1,39 +1,19 @@
 # 源码与构建
 
-Windows x64，Python 3.12，Node.js 18+。
-
-从当前 Release 的 Windows 便携包提取 `_internal/seed` 为仓库根目录的 `seed`，并准备 `resources`。源码仓库不包含个人数据库、题库、音频或 PDF。
-
-```powershell
-python -m venv backend/venv
-backend/venv/Scripts/python.exe -m pip install -r backend/requirements-runtime.txt
-cd frontend
-npm ci
-npm run build
-cd ..
-backend/venv/Scripts/python.exe packaging/launcher.py
-```
-
-安装 `packaging/requirements-build.txt` 后运行 `python packaging/build_windows.py`，输出 `dist/CET-Practice`。导入器依赖另见 `backend/requirements.txt`，支持 `--exam cet4` / `--exam cet6`；资源根目录由 `CET_RESOURCE_ROOT` 指定。更新题库时须保留个人记录。
-
-## macOS
-
-使用对应架构的 macOS 14+、Python 3.12.10、Node.js 22。在 macOS 主机上构建，不能从 Windows 交叉生成。GitHub Actions 的 `Build and verify v1.2.0` 工作流分别运行于 Windows、Apple 芯片和 Intel macOS 主机，构建并验证完整 ZIP。
+需要 Python 3.12.10、Node.js 22；macOS 需要在对应芯片架构的 Mac 上构建。仓库不包含数据库、听力或原 PDF。可从对应版本的发布包提取 `seed/cet6.db` 和 `seed/import-report.json`；附听力版还需从发布包准备 `resources`。请勿使用包含个人记录的数据库作为发布种子。
 
 ```sh
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r packaging/requirements-macos.txt
-python packaging/fetch_release_data.py
+python -m pip install -r packaging/requirements-build.txt # Mac 使用 requirements-macos.txt
 cd frontend
 npm ci
 npm run build
 cd ..
+python packaging/audit_release_seed.py seed/cet6.db
 python tests/test_backend_regressions.py
-python packaging/build_macos.py --arch arm64  # Intel 主机改为 x86_64
-python -m pip install playwright==1.56.0
-python -m playwright install webkit
-python tests/test_macos_package.py --arch arm64
 ```
 
-`fetch_release_data.py` 只提取经过 SHA-256 核验的公开 v1.1.0 听力及升级验证种子，不读取开发机个人数据库。构建前需按上文准备当前版本 `seed`；工作流在发布准备阶段从草稿取得经校验的清洁种子。打包前校验数据库完整性及个人表为空。macOS 成品包含题库与音频，本地数据写入 Application Support；不修改签名应用。签名为 ad-hoc，未进行 Apple 公证，首次打开操作见 [Mac 使用说明](MACOS.md)。
+Windows 构建及压缩：`python packaging/build_windows.py --edition NoAudio`，然后 `python packaging/package_windows.py --edition NoAudio`。附听力版将 `NoAudio` 换成 `WithAudio` 并准备全部音频。
+
+Mac 构建：`python packaging/build_macos.py --arch arm64 --edition NoAudio`；Intel 主机将 `arm64` 改成 `x86_64`，附听力版改为 `WithAudio`。分别使用对应系统运行 `python tests/test_release_v140.py --platform Windows-x64 --edition NoAudio`，或把平台改为 `macOS-arm64` / `macOS-x86_64`。测试还需 Playwright 和旧版公开数据库夹具。
+
+构建工作流使用经校验的清洁种子和公开听力，并在六种系统和音频组合上验证。Mac 使用 ad-hoc 签名，未经过 Apple 公证；使用方式见 [Mac 使用说明](MACOS.md)。

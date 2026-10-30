@@ -13,15 +13,16 @@ from pathlib import Path
 from fetch_release_data import verify_seed
 
 PROJECT = Path(__file__).resolve().parents[1]
-VERSION = '1.3.0'
+VERSION = '1.4.0'
 
 
-def build(arch):
+def build(arch, edition):
     assert sys.platform == 'darwin', 'A macOS build host is required.'
     assert platform.machine() == arch, f'Expected {arch}, got {platform.machine()}'
     verify_seed(PROJECT / 'seed/cet6.db')
     assert (PROJECT / 'frontend/dist/index.html').is_file(), 'Build frontend first.'
-    assert len(list((PROJECT / 'resources').rglob('*.m4a'))) == 76
+    (PROJECT/'seed/release.json').write_text(json.dumps({'audio_edition':edition}), encoding='utf-8')
+    if edition == 'WithAudio': assert len(list((PROJECT / 'resources').rglob('*.m4a'))) == 76
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--windowed',
                '--name', 'CET-Practice', '--target-architecture', arch,
                '--osx-bundle-identifier', 'io.github.o-sakurajimamai-o.cetpractice',
@@ -30,7 +31,6 @@ def build(arch):
                '--paths', str(PROJECT / 'packaging'),
                '--add-data', f'{PROJECT / "frontend/dist"}:frontend/dist',
                '--add-data', f'{PROJECT / "seed"}:seed',
-               '--add-data', f'{PROJECT / "resources"}:resources',
                '--add-data', f'{PROJECT / "third_party_licenses"}:third_party_licenses',
                '--add-data', f'{PROJECT / "THIRD_PARTY_NOTICES.md"}:.',
                '--add-data', f'{PROJECT / "LICENSE-NOTICE.md"}:.',
@@ -40,6 +40,8 @@ def build(arch):
                '--copy-metadata', 'opentelemetry-api',
                '--exclude-module', 'pymupdf', '--exclude-module', 'fitz', '--exclude-module', 'numpy',
                str(PROJECT / 'packaging/launcher.py')]
+    if edition == 'WithAudio':
+        command[-1:-1] = ['--add-data', f'{PROJECT / "resources"}:resources']
     subprocess.run(command, cwd=PROJECT, check=True)
     app = PROJECT / 'dist/CET-Practice.app'
     info_path = app / 'Contents/Info.plist'
@@ -85,12 +87,12 @@ exit 1
     stop.chmod(0o755)
     out = PROJECT / 'release-assets'
     out.mkdir(exist_ok=True)
-    archive = out / f'CET-Practice-v{VERSION}-macOS-{arch}.zip'
+    archive = out / f'CET-Practice-v{VERSION}-macOS-{arch}-{edition}.zip'
     subprocess.run(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(package), str(archive)], check=True)
     digest = hashlib.file_digest(archive.open('rb'), 'sha256').hexdigest()
-    (out / f'SHA256-macOS-{arch}.txt').write_text(f'{digest}  {archive.name}\n', encoding='utf-8')
-    (out / f'build-macOS-{arch}.json').write_text(json.dumps({
-        'version': VERSION, 'architecture': arch, 'build_os': platform.mac_ver()[0],
+    (out / f'SHA256-macOS-{arch}-{edition}.txt').write_text(f'{digest}  {archive.name}\n', encoding='utf-8')
+    (out / f'build-macOS-{arch}-{edition}.json').write_text(json.dumps({
+        'version': VERSION, 'edition':edition, 'architecture': arch, 'build_os': platform.mac_ver()[0],
         'minimum_os': '14.0', 'signature': 'ad-hoc; not Apple notarized',
         'bytes': archive.stat().st_size, 'sha256': digest,
     }, indent=2), encoding='utf-8')
@@ -100,4 +102,6 @@ exit 1
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--arch', choices=['arm64', 'x86_64'], required=True)
-    build(parser.parse_args().arch)
+    parser.add_argument('--edition', choices=['WithAudio','NoAudio'], required=True)
+    args=parser.parse_args()
+    build(args.arch, args.edition)

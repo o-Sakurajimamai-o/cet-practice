@@ -16,8 +16,8 @@ def verify_seed(path):
     with sqlite3.connect(f'{path.as_uri()}?mode=ro', uri=True) as conn:
         assert conn.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
         assert not conn.execute('PRAGMA foreign_key_check').fetchall()
-        assert conn.execute('SELECT COUNT(*) FROM papers').fetchone()[0] == 122
-        assert conn.execute('SELECT COUNT(*) FROM questions').fetchone()[0] == 6089
+        assert conn.execute('SELECT COUNT(*) FROM papers').fetchone()[0] == 168
+        assert conn.execute('SELECT COUNT(*) FROM questions').fetchone()[0] == 8341
         for table in ['sessions', 'wrong_book', 'favorites', 'notes', 'text_marks', 'manual_fixes', 'meta']:
             assert conn.execute('SELECT COUNT(*) FROM ' + table).fetchone()[0] == 0, table
 

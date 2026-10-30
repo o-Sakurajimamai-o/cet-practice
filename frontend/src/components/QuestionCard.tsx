@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNoteDraft, rememberNoteDraft, persistNoteDraft } from '../noteDrafts'
+import { examOf, paperShort } from '../exam'
 import PdfProse from './PdfProse'
 import Icon from './Icon'
 import SentenceInsights from './SentenceInsights'
+import { KaoyanAnalysis, KaoyanQuestionBody, choiceText, kaoyanVariant } from './KaoyanQuestion'
 
-/** 单题卡片：按题型渲染点击作答交互；交卷后显示对错。 */
+/** 单题卡片：按题型渲染点击作答交互；交卷后显示对错。考研题的作答区与解析由 KaoyanQuestion 渲染。 */
 export default function QuestionCard({
   q: baseQuestion, answer, onAnswer, submitted, detail, isCurrent, favorite,
-  onToggleFav, onReveal, analysisData, paragraphLabels, saving = false,
+  onToggleFav, onReveal, analysisData, paragraphLabels, saving = false, kaoyanMaterial,
 }: {
   q: any
   answer: any
@@ -21,6 +23,7 @@ export default function QuestionCard({
   onReveal: () => Promise<any>
   analysisData: any  // questionDetail 结果（含解析/材料）
   paragraphLabels: string[]
+  kaoyanMaterial?: any  // 考研：本题所在分组的会话材料（排序链、空位位置、写作要求）
 }) {
   const [showAnalysis, setShowAnalysis] = useState(false)
   const [analysisLoading, setAnalysisLoading] = useState(false)
@@ -29,6 +32,11 @@ export default function QuestionCard({
   const [favoriteError, setFavoriteError] = useState('')
   const [loadedDetail, setLoadedDetail] = useState<any | null>(null)
   const q = { ...loadedDetail, ...baseQuestion }
+  const kaoyan = examOf(baseQuestion) === 'kaoyan'
+  // Kaoyan references come from this question's own group: a pre-submit reveal only carries those (CONTRACT §9.2).
+  const ownMaterial = kaoyan
+    ? (analysisData?.materials || []).find((m: any) => (m.group_key || 'main') === (q.group_key || 'main')) || kaoyanMaterial
+    : undefined
   const markBase = 1000 + (Number(q.q_no) || 0) * 100
   const choose = (key: string, keyboard = false) => {
     if (submitted || saving || (!keyboard && !window.getSelection()?.isCollapsed)) return
@@ -112,14 +120,14 @@ export default function QuestionCard({
   }
 
   return (
-    <div className={`qcard${isCurrent ? ' current-q' : ''}${verdict ? ` verdict-${verdict}` : ''}`} id={`q-${q.uid}`}>
+    <div className={`qcard${kaoyan ? ` ky-card-${kaoyanVariant(q)}` : ''}${isCurrent ? ' current-q' : ''}${verdict ? ` verdict-${verdict}` : ''}`} id={`q-${q.uid}`}>
       <div className="qhead">
         <span className="qno">{q.q_no}</span>
         <span className="tag">{q.section_cn}</span>
-        {q.paper_key && <span className="muted small">{q.paper_key}</span>}
-        {q.status === 'needs_review' && <span className="tag warn" title={q.flags?.join('；')}>待核对</span>}
+        {q.paper_key && <span className="muted small">{kaoyan ? paperShort(q.paper_key) : q.paper_key}</span>}
+        {q.status === 'needs_review' && <span className="tag warn" title={Array.isArray(q.flags) ? q.flags.join('；') : undefined}>待核对</span>}
         {!q.has_answer && q.qtype !== 'essay' && q.qtype !== 'translation' && (
-          <span className="tag warn">无标准答案（不判分）</span>
+          <span className="tag warn">{kaoyan ? '无参考答案（不判分）' : '无标准答案（不判分）'}</span>
         )}
         {submitted && verdict === 'correct' && <span className="tag ok"><Icon name="check" size={13}/>答对</span>}
         {submitted && verdict === 'wrong' && <span className="tag err"><Icon name="close" size={13}/>答错</span>}
@@ -135,11 +143,16 @@ export default function QuestionCard({
       {favoriteError && <div className="muted small" role="alert">{favoriteError}</div>}
 
       {submitted && detail?.kind === 'objective' && <div className="review-answer">
-        <span>你的作答：<b>{detail.choice || '未作答'}</b></span>
-        <span>交卷时的答案：<b>{detail.answer || '无标准答案'}</b></span>
+        <span>你的作答：<b>{(kaoyan ? choiceText(q, detail.choice) : detail.choice) || '未作答'}</b></span>
+        {kaoyan
+          ? <span>交卷时的参考答案：<b>{choiceText(q, detail.answer) || '无参考答案'}</b></span>
+          : <span>交卷时的答案：<b>{detail.answer || '无标准答案'}</b></span>}
       </div>}
 
-      {q.qtype === 'mcq' && (
+      {kaoyan && <KaoyanQuestionBody q={q} answer={answer} material={kaoyanMaterial} displayAnswer={displayAnswer}
+        submitted={submitted} saving={saving} markBase={markBase} onChoose={choose} onKeyChoose={chooseKey} onDraft={onAnswer}/>}
+
+      {!kaoyan && q.qtype === 'mcq' && (
         <>
           {q.stem && <div className="stem" data-mark-index={markBase}>{q.stem}</div>}
           <div className="opts">
@@ -172,7 +185,7 @@ export default function QuestionCard({
         </>
       )}
 
-      {q.qtype === 'blank' && (
+      {!kaoyan && q.qtype === 'blank' && (
         <>
           {q.stem && (
             <div className="stem muted">
@@ -199,7 +212,7 @@ export default function QuestionCard({
         </>
       )}
 
-      {q.qtype === 'match' && (
+      {!kaoyan && q.qtype === 'match' && (
         <>
           <div className="stem" data-mark-index={markBase}>{q.stem}</div>
           <div className="letter-row">
@@ -219,7 +232,7 @@ export default function QuestionCard({
         </>
       )}
 
-      {(q.qtype === 'essay' || q.qtype === 'translation') && (
+      {!kaoyan && (q.qtype === 'essay' || q.qtype === 'translation') && (
         <>
           <div className="hint">
             此题由你自行完成，可只看题目；下方文本框仅用于记录草稿（可不填，不判分，不影响交卷）。
@@ -237,6 +250,7 @@ export default function QuestionCard({
 
       {canShowAnalysis && (
         <div className="analysis">
+          {kaoyan ? <KaoyanAnalysis q={q} submitted={submitted} detail={detail} verdict={verdict} markBase={markBase} material={ownMaterial}/> : <>
           {q.qtype !== 'essay' && q.qtype !== 'translation' && (
             <div className="answer-line">
               <span className="answer-key">
@@ -311,6 +325,7 @@ export default function QuestionCard({
             )
           })}
           <SentenceInsights markBase={markBase} materials={analysisData?.materials || loadedDetail?.materials}/>
+          </>}
           {/* 笔记 */}
           <div className="note-box">
             <div className="analysis-title"><Icon name="note" size={15}/>我的笔记</div>
@@ -344,7 +359,7 @@ export default function QuestionCard({
         {submitted && showAnalysis && (
           <button className="ghost" onClick={toggleAnalysis}><Icon name="eye" size={16}/>收起解析</button>
         )}
-        {q.source_file && (
+        {!kaoyan && q.source_file && (
           <a
             className="pdf-link"
             href={`/api/pdf?path=${encodeURIComponent(q.source_file)}#page=${q.source_page || 1}`}

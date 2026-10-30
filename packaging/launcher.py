@@ -102,6 +102,7 @@ def main():
     native_quit_app = None
     try:
         database = data / 'cet6.db'
+        os.environ['CET6_FRESH_DATABASE'] = '0'
         if not database.exists():
             seed = bundle / 'seed/cet6.db'
             if not seed.exists(): seed = home / 'seed/cet6.db'
@@ -109,6 +110,7 @@ def main():
             temporary = data / 'cet6.db.new'
             shutil.copy2(seed, temporary)
             temporary.replace(database)
+            os.environ['CET6_FRESH_DATABASE'] = '1'
         report = data / 'import-report.json'
         if not report.exists(): shutil.copy2(bundle / 'seed/import-report.json', report)
         settings_path = user_root / 'settings.json'
@@ -122,6 +124,10 @@ def main():
             os.environ['CET_PDF_RESOURCE_ROOT'] = str(Path(settings['pdf_resource_directory']).expanduser().resolve())
         os.environ['CET6_FRONTEND_DIST'] = str(bundle / 'frontend/dist')
         os.environ['CET6_DB_PATH'] = str(database)
+        os.environ['CET6_SEED_DB'] = str(bundle / 'seed/cet6.db')
+        edition = json.loads((bundle / 'seed/release.json').read_text(encoding='utf-8'))['audio_edition']
+        if edition not in ('NoAudio', 'WithAudio'): raise RuntimeError('Unknown release edition')
+        os.environ['CET_AUDIO_EDITION'] = edition
         instance_id, token = secrets.token_hex(16), secrets.token_hex(32)
         os.environ['CET6_INSTANCE_TOKEN'] = token
         if not getattr(sys, 'frozen', False): sys.path.insert(0, str(home / 'backend'))

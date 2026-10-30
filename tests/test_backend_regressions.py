@@ -44,7 +44,7 @@ for name in ("db", "main"):
     spec.loader.exec_module(module)
 db, api = pkg.db, pkg.main
 api.PROJECT = PROJECT
-api.ROOT = PROJECT / "resources"
+api.ROOT = PROJECT.parent
 
 
 async def asgi_request(method, target, body=None, headers=None):
@@ -402,6 +402,48 @@ class BackendRegressions(unittest.TestCase):
         status, hdr, _ = self.request("GET", target, headers={"Range": "bytes=20-"})
         self.assertEqual(status, 416)
         self.assertEqual(hdr.get("content-range"), "bytes */10")
+
+    def test_all_marks_join_papers_filter_exam_and_keep_orphans(self):
+        self.conn.execute("DELETE FROM text_marks")
+        self.conn.commit()
+        cet6 = dict(self.conn.execute("SELECT * FROM papers WHERE exam_type='cet6' ORDER BY id LIMIT 1").fetchone())
+        cet4 = dict(self.conn.execute("SELECT * FROM papers WHERE exam_type='cet4' ORDER BY id LIMIT 1").fetchone())
+        def mark(paper_key, section, text, created_at):
+            return {"id": str(uuid.uuid4()), "paper_key": paper_key, "section": section, "passage_index": 0,
+                    "start_offset": 0, "end_offset": len(text), "text": text, "created_at": created_at}
+        old6 = self.ok("POST", "/api/marks", mark(cet6["paper_key"], "reading1", "probably", "2026-10-01T08:00:00.000Z"))
+        new6 = self.ok("POST", "/api/marks", mark(cet6["paper_key"], "translation", "economy", "2026-10-03T08:00:00.000Z"))
+        only4 = self.ok("POST", "/api/marks", mark(cet4["paper_key"], "listening", "campus", "2026-10-02T08:00:00.000Z"))
+        # Orphans cannot be created through the API; they appear when a paper leaves the library.
+        orphan6 = mark("2099-06-9", "cloze", "orphan", "2026-10-04T08:00:00.000Z")
+        orphan4 = mark("cet4-2099-06-9", "cloze", "orphan4", "2026-09-30T08:00:00.000Z")
+        for row in (orphan6, orphan4):
+            self.conn.execute("INSERT INTO text_marks(id,paper_key,section,passage_index,start_offset,end_offset,text,created_at) VALUES(:id,:paper_key,:section,:passage_index,:start_offset,:end_offset,:text,:created_at)", row)
+        self.conn.commit()
+
+        rows = self.ok("GET", "/api/marks/all")["marks"]
+        self.assertEqual([r["id"] for r in rows], [orphan6["id"], new6["id"], only4["id"], old6["id"], orphan4["id"]])
+        first6 = next(r for r in rows if r["id"] == old6["id"])
+        for column in ("paper_key", "section", "passage_index", "start_offset", "end_offset", "text", "created_at"):
+            self.assertEqual(first6[column], old6[column])
+        self.assertEqual((first6["exam_type"], first6["year"], first6["month"], first6["set_no"]),
+                         ("cet6", cet6["year"], cet6["month"], cet6["set_no"]))
+        self.assertEqual((first6["section_cn"], first6["paper_missing"]), ("仔细阅读一", False))
+        lost = next(r for r in rows if r["id"] == orphan6["id"])
+        self.assertEqual((lost["year"], lost["month"], lost["set_no"], lost["paper_missing"], lost["exam_type"], lost["section_cn"]),
+                         (None, None, None, True, "cet6", "选词填空"))
+
+        self.assertEqual([r["id"] for r in self.ok("GET", "/api/marks/all?exam=cet6")["marks"]], [orphan6["id"], new6["id"], old6["id"]])
+        self.assertEqual([r["id"] for r in self.ok("GET", "/api/marks/all?exam=cet4")["marks"]], [only4["id"], orphan4["id"]])
+        for bad in ("cet5", "CET6", ""):
+            with self.subTest(exam=bad):
+                self.assertEqual(self.request("GET", f"/api/marks/all?exam={bad}")[0], 422)
+        # Existing per-section listing and deletion keep their behavior.
+        self.assertEqual([r["id"] for r in self.ok("GET", f"/api/marks?paper_key={cet6['paper_key']}&section=reading1")["marks"]], [old6["id"]])
+        self.assertEqual(self.request("GET", "/api/marks")[0], 422)
+        self.ok("DELETE", f"/api/marks/{old6['id']}")
+        self.assertNotIn(old6["id"], [r["id"] for r in self.ok("GET", "/api/marks/all")["marks"]])
+
     def test_source_path_rejects_sibling_and_absolute_paths(self):
         sibling = api.ROOT.parent / (api.ROOT.name + "-other") / "private.pdf"
         with self.assertRaises(api.HTTPException):

@@ -50,9 +50,9 @@ def get_asset_via_api(repo, token):
     for r in releases:
         tag = r.get('tag_name', '')
         rel_name = r.get('name', '')
-        if tag == 'v1.3.0' or tag == 'v1.2.0':
+        if tag == 'v1.4.0':
             for asset in r.get('assets', []):
-                for name in ['CET-Practice-v1.3.0-clean-build-seed.zip', 'CET-Practice-v1.2.0-Windows-x64.zip']:
+                for name in ['CET-Practice-v1.4.0-clean-build-seed.zip']:
                     if asset['name'] == name:
                         dest = target / name
                         print(f"Downloading {name} (asset ID {asset['id']}) from release {r.get('id')}...", flush=True)
@@ -62,7 +62,7 @@ def get_asset_via_api(repo, token):
 
 
 def main():
-    for name in ['CET-Practice-v1.3.0-clean-build-seed.zip', 'CET-Practice-v1.2.0-Windows-x64.zip']:
+    for name in ['CET-Practice-v1.4.0-clean-build-seed.zip']:
         if (target / name).is_file():
             print(f'Found existing build seed: {name}')
             return
@@ -78,8 +78,8 @@ def main():
         except Exception as e:
             print(f'API download failed: {e}', flush=True)
 
-    for name in ['CET-Practice-v1.3.0-clean-build-seed.zip', 'CET-Practice-v1.2.0-Windows-x64.zip']:
-        result = subprocess.run(['gh', 'release', 'download', 'v1.2.0', '--pattern', name, '--dir', str(target)],
+    for name in ['CET-Practice-v1.4.0-clean-build-seed.zip']:
+        result = subprocess.run(['gh', 'release', 'download', 'v1.4.0', '--pattern', name, '--dir', str(target)],
                                 capture_output=True, text=True)
         if result.returncode == 0 and (target / name).is_file():
             print(f'Retrieved a build seed via gh CLI: {name}')

@@ -23,12 +23,22 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db
+from . import db, kaoyan
 
 PROJECT = Path(os.environ.get("CET6_PROJECT_DIR", Path(__file__).resolve().parents[2]))
 ROOT = Path(os.environ.get("CET_RESOURCE_ROOT", os.environ.get("CET6_RESOURCE_ROOT", PROJECT / "resources")))
 PDF_ROOT = Path(os.environ["CET_PDF_RESOURCE_ROOT"]) if os.environ.get("CET_PDF_RESOURCE_ROOT") else None
 FRONTEND_DIST = Path(os.environ.get("CET6_FRONTEND_DIST", PROJECT / "frontend" / "dist"))
+AUDIO_EDITION = os.environ.get("CET_AUDIO_EDITION", "WithAudio")
+
+def _audio_available(path):
+    if AUDIO_EDITION == "NoAudio" or not path:
+        return False
+    try:
+        return _safe_source_path(path).is_file()
+    except (HTTPException, OSError):
+        return False
+
 
 app = FastAPI(title="四六级研习室", docs_url=None, redoc_url=None)
 
@@ -62,6 +72,59 @@ SECTION_ORDER_SQL = ("CASE section WHEN 'listening' THEN 1 WHEN 'cloze' THEN 2 "
                      "WHEN 'matching' THEN 3 WHEN 'reading1' THEN 4 WHEN 'reading2' THEN 5 "
                      "WHEN 'writing' THEN 6 WHEN 'translation' THEN 7 END")
 OBJECTIVE_SECTIONS = {"listening", "cloze", "matching", "reading1", "reading2"}
+ExamType = Literal["cet4", "cet6", "kaoyan"]
+# Papers whose row is gone (orphan marks) fall back to the key pattern; kaoyan.exam_of_key mirrors it.
+EXAM_FALLBACK_SQL = "CASE WHEN {key} LIKE 'cet4-%' THEN 'cet4' WHEN {key} LIKE '%-kaoyan-%' THEN 'kaoyan' ELSE 'cet6' END"
+
+
+def _section_cn(section: str, exam: str | None) -> str:
+    return kaoyan.section_label(section) if exam == "kaoyan" else SECTION_CN.get(section, section)
+
+
+def _has_table(conn, name: str) -> bool:
+    # Tables added after a database was created exist only once init_db has run on it.
+    return conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
+
+
+def _ids(values) -> tuple[list, str]:
+    values = list(dict.fromkeys(values))
+    return values, ",".join("?" for _ in values)
+
+
+def _kaoyan_layouts(conn, paper_ids) -> dict[int, dict]:
+    """Paper-wide kaoyan facts (Part B variant, translation sentences, cloze text): two queries for any number of papers."""
+    ids, ph = _ids(paper_ids)
+    if not ids:
+        return {}
+    mats = conn.execute(
+        f"SELECT paper_id, section, group_key, directions, content_json FROM section_materials "
+        f"WHERE paper_id IN ({ph}) AND section IN ('cloze','matching','translation') ORDER BY paper_id, section, group_key", ids,
+    ).fetchall()
+    qs = conn.execute(
+        f"SELECT paper_id, section, q_no, stem, options_json, answer FROM questions "
+        f"WHERE paper_id IN ({ph}) AND section IN ('matching','translation') ORDER BY paper_id, q_no", ids,
+    ).fetchall()
+    return {pid: kaoyan.paper_layout([m for m in mats if m["paper_id"] == pid], [q for q in qs if q["paper_id"] == pid]) for pid in ids}
+
+
+class _KaoyanContext:
+    """Facts shared by the kaoyan questions of one response, read once: layouts, answer checks, source URLs."""
+
+    def __init__(self, layouts=None, checks=None, urls=None):
+        self.layouts, self.checks, self.urls = layouts or {}, checks or {}, urls or {}
+
+
+def _kaoyan_context(conn, rows, with_answer: bool) -> _KaoyanContext:
+    """rows: the kaoyan question rows of one response (with uid, paper_id, section)."""
+    paper_ids, paper_ph = _ids(r["paper_id"] for r in rows)
+    uids, ph = _ids(r["uid"] for r in rows if with_answer and r["section"] in OBJECTIVE_SECTIONS)
+    checks = urls = None
+    if uids and _has_table(conn, "answer_checks"):
+        checks = {r["uid"]: r for r in conn.execute(f"SELECT * FROM answer_checks WHERE uid IN ({ph})", uids)}
+    if uids and _has_table(conn, "kaoyan_canonical"):
+        urls = {r["paper_id"]: r["source_url"] for r in conn.execute(
+            f"SELECT paper_id, source_url FROM kaoyan_canonical WHERE paper_id IN ({paper_ph})", paper_ids)}
+    return _KaoyanContext(_kaoyan_layouts(conn, paper_ids), checks, urls)
 
 
 def _question_or_404(conn, uid: str):
@@ -115,9 +178,26 @@ def _normalize_fix(conn, question, field: str, value):
 
 
 # ================================================================ 试卷库
+def _answer_check_counts(conn, paper_ids) -> dict[int, dict]:
+    """Objective questions per answer-check status; no row counts as source_only, a manual fix as manual."""
+    ids, ph = _ids(paper_ids)
+    if not ids:
+        return {}
+    joined = _has_table(conn, "answer_checks")
+    rows = conn.execute(
+        f"SELECT q.paper_id, q.manual_locked, {'a.status' if joined else 'NULL'} AS status FROM questions q "
+        f"{'LEFT JOIN answer_checks a ON a.uid=q.uid ' if joined else ''}"
+        f"WHERE q.paper_id IN ({ph}) AND q.section IN ('cloze','reading1','matching')", ids,
+    ).fetchall()
+    statuses: dict[int, list] = {pid: [] for pid in ids}
+    for r in rows:
+        statuses[r["paper_id"]].append("manual" if r["manual_locked"] else r["status"] or "source_only")
+    return {pid: kaoyan.check_counts(values) for pid, values in statuses.items()}
+
+
 @app.get("/api/papers")
 def list_papers(year: int | None = None, month: int | None = None,
-                section: str | None = None, exam: Literal["cet4", "cet6"] | None = None):
+                section: str | None = None, exam: ExamType | None = None):
     conn = db.connect()
     try:
         sql = "SELECT * FROM papers"
@@ -132,6 +212,8 @@ def list_papers(year: int | None = None, month: int | None = None,
             sql += " WHERE " + " AND ".join(cond)
         sql += " ORDER BY year DESC, month DESC, set_no"
         papers = [dict(r) for r in conn.execute(sql, args).fetchall()]
+        # Never touches kaoyan_canonical.document_json (≈72 MB); the counts come from answer_checks.
+        check_counts = _answer_check_counts(conn, [p["id"] for p in papers if p["exam_type"] == "kaoyan"])
         for p in papers:
             qs = conn.execute(
                 "SELECT section, qtype, COUNT(*) n, SUM(answer IS NOT NULL) na "
@@ -147,7 +229,8 @@ def list_papers(year: int | None = None, month: int | None = None,
             p["question_counts"] = sections
             p["objective_total"] = obj_n
             p["objective_keyed"] = obj_key
-            p["has_audio"] = bool(p["audio_path"])
+            p["has_audio"] = _audio_available(p["audio_path"])
+            p["audio_edition"] = AUDIO_EDITION
             p["shared_sources"] = json.loads(p.get("shared_sources_json") or "{}")
             s = conn.execute(
                 "SELECT id, started_at, updated_at, submitted_at, answers_json FROM sessions WHERE paper_id=? AND mode='full' "
@@ -183,9 +266,12 @@ def list_papers(year: int | None = None, month: int | None = None,
                 ("done" if last_submitted else "not_started")
             )
             p["_filtered_out"] = bool(section and section not in sections)
+            if p["exam_type"] == "kaoyan":
+                p.update(kaoyan.paper_fields(p), coverage_note=kaoyan.coverage_note(p["year"]),
+                         answer_check_counts=check_counts.get(p["id"], {}))
         if section:
             papers = [p for p in papers if not p["_filtered_out"]]
-        return {"papers": papers, "section_cn": SECTION_CN}
+        return {"papers": papers, "section_cn": kaoyan.SECTION_CN if exam == "kaoyan" else SECTION_CN}
     finally:
         conn.close()
 
@@ -197,17 +283,24 @@ def _paper_or_404(conn, paper_key: str):
     return row
 
 
-def _question_public(r: sqlite3.Row, with_answer: bool = False) -> dict:
+def _question_public(r: sqlite3.Row, with_answer: bool = False, exam: str | None = None,
+                     ky: _KaoyanContext | None = None) -> dict:
+    exam = exam or kaoyan.exam_of_key(r["paper_key"])
+    flags = json.loads(r["flags_json"] or "[]")
     d = {
-        "uid": r["uid"], "paper_key": r["paper_key"], "section": r["section"], "section_cn": SECTION_CN.get(r["section"], r["section"]),
+        "uid": r["uid"], "paper_key": r["paper_key"], "exam_type": exam,
+        "section": r["section"], "section_cn": SECTION_CN.get(r["section"], r["section"]),
         "q_no": r["q_no"], "q_index": r["q_index"], "qtype": r["qtype"],
         "group_key": r["group_key"], "stem": r["stem"],
         "options": json.loads(r["options_json"] or "[]"),
-        "status": r["status"], "flags": json.loads(r["flags_json"] or "[]"),
+        # Kaoyan rows store an object (canonical type, category); the UI only knows flag lists.
+        "status": r["status"], "flags": flags if isinstance(flags, list) else [],
         "source_file": r["source_file"], "source_page": r["source_page"],
         "has_answer": r["answer"] is not None,
         "has_analysis": bool(r["analysis_text"]),
     }
+    if exam == "kaoyan":
+        return _kaoyan_question(r, d, with_answer, ky or _KaoyanContext())
     if with_answer:
         d["answer"] = r["answer"]
         d["answer_source"] = r["answer_source"]
@@ -220,6 +313,37 @@ def _question_public(r: sqlite3.Row, with_answer: bool = False) -> dict:
     return d
 
 
+def _kaoyan_question(r: sqlite3.Row, d: dict, with_answer: bool, ky: _KaoyanContext) -> dict:
+    variant = kaoyan.question_variant(r["section"], ky.layouts.get(r["paper_id"]), r["answer"])
+    # source_file is a lazynote section URL, not a local PDF: expose it as source_url so no 原 PDF link breaks.
+    d.update(section_cn=kaoyan.section_label(r["section"], variant), variant=variant,
+             options=kaoyan.clean_options(d["options"]), source_file=None, source_url=r["source_file"])
+    if with_answer:
+        d["answer"] = r["answer"]
+        d["answer_source"] = kaoyan.answer_source(r["section"])
+        d["analysis_text"] = r["analysis_text"]
+        d["answer_word"] = kaoyan.answer_word(r["section"], d["options"], r["answer"])
+        if r["section"] in OBJECTIVE_SECTIONS:
+            url = ky.urls.get(r["paper_id"]) or (r["answer_source"] if str(r["answer_source"] or "").startswith("http") else None)
+            d["answer_check"] = kaoyan.answer_check(r["answer"], r["manual_locked"], ky.checks.get(r["uid"]), url)
+    return d
+
+
+def _kaoyan_paper(p) -> dict:
+    """A kaoyan paper row plus its track, title and coverage note (month is never meaningful)."""
+    return {**dict(p), **kaoyan.paper_fields(p), "coverage_note": kaoyan.coverage_note(p["year"])}
+
+
+def _kaoyan_sections(conn, paper_id: int, include_refs: bool, layout: dict | None = None, section: str | None = None) -> dict:
+    rows = conn.execute(
+        "SELECT * FROM section_materials WHERE paper_id=?" + (" AND section=?" if section else "") + " ORDER BY section, group_key",
+        (paper_id, section) if section else (paper_id,),
+    ).fetchall()
+    if layout is None:
+        layout = _kaoyan_layouts(conn, [paper_id]).get(paper_id)
+    return kaoyan.materials(rows, layout, include_refs)
+
+
 @app.get("/api/papers/{paper_key}")
 def paper_detail(paper_key: str):
     conn = db.connect()
@@ -230,8 +354,16 @@ def paper_detail(paper_key: str):
             (p["id"],),
         ).fetchall()]
         raw_pdfs = [m["file_path"] for m in materials if m["kind"] in ("question", "analysis")]
+        if p["exam_type"] == "kaoyan":
+            rows = conn.execute("SELECT * FROM questions WHERE paper_id=? ORDER BY q_no", (p["id"],)).fetchall()
+            ky = _kaoyan_context(conn, rows, with_answer=False)
+            return {
+                "paper": _kaoyan_paper(p), "sections": _kaoyan_sections(conn, p["id"], False, ky.layouts.get(p["id"])),
+                "questions": [_question_public(r, False, "kaoyan", ky) for r in rows],
+                "raw_pdfs": raw_pdfs, "audio_url": None,
+            }
         smats = conn.execute(
-            "SELECT * FROM section_materials WHERE paper_id=?", (p["id"],),
+            "SELECT * FROM section_materials WHERE paper_id=? ORDER BY section, group_key", (p["id"],),
         ).fetchall()
         sections = {}
         for r in smats:
@@ -243,14 +375,14 @@ def paper_detail(paper_key: str):
                 "status": r["status"],
                 "source_file": r["source_file"],
             }
-        questions = [_question_public(r) for r in conn.execute(
+        questions = [_question_public(r, exam=p["exam_type"]) for r in conn.execute(
             f"SELECT * FROM questions WHERE paper_id=? ORDER BY {SECTION_ORDER_SQL}, q_index",
             (p["id"],),
         ).fetchall()]
         return {
             "paper": dict(p), "sections": sections, "questions": questions,
             "raw_pdfs": raw_pdfs,
-            "audio_url": f"/api/audio/{paper_key}" if p["audio_path"] else None,
+            "audio_url": f"/api/audio/{paper_key}" if _audio_available(p["audio_path"]) else None,
         }
     finally:
         conn.close()
@@ -310,10 +442,13 @@ def create_redo(body: RedoBody):
         uids = list(dict.fromkeys(body.uids))
         ph = ",".join("?" for _ in uids)
         rows = conn.execute(
-            f"SELECT uid, paper_id FROM questions WHERE uid IN ({ph})", uids
+            f"SELECT q.uid, q.paper_id, p.exam_type FROM questions q JOIN papers p ON p.id=q.paper_id WHERE q.uid IN ({ph})", uids
         ).fetchall()
         if len(rows) != len(uids):
             raise HTTPException(404, "部分题目不存在，请刷新题目列表")
+        # A session belongs to one exam: labels, ordering, grading notes and history all follow it.
+        if len({row["exam_type"] for row in rows}) > 1:
+            raise HTTPException(400, "不能把不同考试的题目放在同一次重做中，请分别重做")
         pid = next(row["paper_id"] for row in rows if row["uid"] == uids[0])
         cur = conn.execute(
             "INSERT INTO sessions(paper_id, mode, scope_json, session_key) VALUES(?,?,?,?)",
@@ -358,10 +493,32 @@ def _scope_uids(conn, sess: sqlite3.Row) -> list[str]:
         raise HTTPException(400, "练习范围数据损坏，无法恢复该会话") from exc
     if scope:
         return list(dict.fromkeys(scope))
+    paper = conn.execute("SELECT exam_type FROM papers WHERE id=?", (sess["paper_id"],)).fetchone()
+    # Kaoyan q_no already runs in exam order (完形 → 阅读 A → 新题型 → 翻译 → 写作).
+    order = "q_no" if paper and paper["exam_type"] == "kaoyan" else f"{SECTION_ORDER_SQL}, q_index"
     return [r["uid"] for r in conn.execute(
-        f"SELECT uid FROM questions WHERE paper_id=? ORDER BY {SECTION_ORDER_SQL}, q_index",
+        f"SELECT uid FROM questions WHERE paper_id=? ORDER BY {order}",
         (sess["paper_id"],),
     ).fetchall()]
+
+
+def _paper_brief(p) -> dict:
+    brief = {"paper_key": p["paper_key"], "exam_type": p["exam_type"], "year": p["year"], "month": p["month"], "set_no": p["set_no"]}
+    return {**brief, **kaoyan.paper_fields(p)} if p["exam_type"] == "kaoyan" else brief
+
+
+def _kaoyan_pdfs(conn, papers) -> dict[str, list]:
+    """Whole-paper PDFs registered as materials.section='full'; paths are relative to ROOT for /api/pdf."""
+    keys = {p["id"]: p["paper_key"] for p in papers}
+    out: dict[str, list] = {key: [] for key in keys.values()}
+    ids, ph = _ids(keys)
+    for r in conn.execute(
+        f"SELECT paper_id, kind, file_path FROM materials WHERE section='full' AND kind IN ('question','analysis') "
+        f"AND paper_id IN ({ph}) ORDER BY paper_id, kind DESC, file_path", ids,
+    ):
+        out[keys[r["paper_id"]]].append({"label": kaoyan.PDF_LABEL[r["kind"]], "path": r["file_path"],
+                                            "url": kaoyan.PDF_LINKS.get(keys[r["paper_id"]], {}).get(r["kind"])})
+    return out
 
 
 @app.get("/api/sessions/{sid}")
@@ -372,21 +529,32 @@ def get_session(sid: int):
         sess = _session_or_404(conn, sid)
         uids = _scope_uids(conn, sess)
         ph = ",".join("?" for _ in uids)
-        qs = [_question_public(r, with_answer=bool(sess["submitted_at"]))
-              for r in conn.execute(
-                  f"SELECT * FROM questions WHERE uid IN ({ph})", uids,
-              ).fetchall()]
-        order = {s: i for i, s in enumerate(SECTION_ORDER)}
-        qs.sort(key=lambda q: (order.get(q["section"], 99), q["q_index"]))
+        submitted = bool(sess["submitted_at"])
+        rows = conn.execute(f"SELECT * FROM questions WHERE uid IN ({ph})", uids).fetchall()
         p = conn.execute("SELECT * FROM papers WHERE id=?", (sess["paper_id"],)).fetchone()
-        paper_keys = sorted({q["paper_key"] for q in qs} | {p["paper_key"]})
+        paper_keys = sorted({r["paper_key"] for r in rows} | {p["paper_key"]})
         paper_ph = ",".join("?" for _ in paper_keys)
+        papers = {row["paper_key"]: row for row in conn.execute(
+            f"SELECT * FROM papers WHERE paper_key IN ({paper_ph}) ORDER BY paper_key", paper_keys)}
+        exam_of = {key: papers[key]["exam_type"] if key in papers else kaoyan.exam_of_key(key) for key in paper_keys}
+        ky = _kaoyan_context(conn, [r for r in rows if exam_of[r["paper_key"]] == "kaoyan"], with_answer=submitted)
+        qs = [_question_public(r, submitted, exam_of[r["paper_key"]], ky) for r in rows]
+        if p["exam_type"] == "kaoyan":
+            qs = kaoyan.kaoyan_order(qs, uids)
+        else:
+            order = {s: i for i, s in enumerate(SECTION_ORDER)}
+            qs.sort(key=lambda q: (order.get(q["section"], 99), q["q_index"]))
         smats = conn.execute(
-            f"SELECT sm.*, p.paper_key FROM section_materials sm JOIN papers p ON p.id=sm.paper_id WHERE p.paper_key IN ({paper_ph})", paper_keys,
+            f"SELECT sm.*, p.paper_key FROM section_materials sm JOIN papers p ON p.id=sm.paper_id WHERE p.paper_key IN ({paper_ph}) "
+            "ORDER BY p.paper_key, sm.section, sm.group_key", paper_keys,
         ).fetchall()
         sections_by_paper = {}
+        kaoyan_mats: dict[str, list] = {}
         for r in smats:
             sections = sections_by_paper.setdefault(r["paper_key"], {})
+            if exam_of[r["paper_key"]] == "kaoyan":
+                kaoyan_mats.setdefault(r["paper_key"], []).append(r)  # normalized below, one paper at a time
+                continue
             sections.setdefault(r["section"], {})[r["group_key"] or "main"] = {
                 "directions": r["directions"],
                 "content": json.loads(r["content_json"] or "{}") if r["content_json"] else {},
@@ -394,7 +562,13 @@ def get_session(sid: int):
                 "analysis_text": r["analysis_text"],
                 "status": r["status"],
             }
-        return {
+        if kaoyan_mats:
+            ids = [papers[key]["id"] for key in kaoyan_mats]
+            layouts = {**_kaoyan_layouts(conn, [pid for pid in ids if pid not in ky.layouts]), **ky.layouts}
+            for key, mats in kaoyan_mats.items():
+                # Reference translations, model essays and paragraph translations appear only after submission.
+                sections_by_paper[key] = kaoyan.materials(mats, layouts.get(papers[key]["id"]), include_refs=submitted)
+        result = {
             "session": {
                 "id": sess["id"], "paper_id": sess["paper_id"], "mode": sess["mode"],
                 "paper_key": p["paper_key"], "started_at": sess["started_at"],
@@ -408,12 +582,19 @@ def get_session(sid: int):
                 "scope": uids,
                 "result": json.loads(sess["result_json"]) if sess["result_json"] else None,
             },
-            "paper": dict(p), "questions": qs, "sections": sections_by_paper.get(p["paper_key"], {}),
+            "paper": _kaoyan_paper(p) if p["exam_type"] == "kaoyan" else dict(p),
+            "questions": qs, "sections": sections_by_paper.get(p["paper_key"], {}),
             "sections_by_paper": sections_by_paper,
-            "audio_by_paper": {row["paper_key"]: f"/api/audio/{row['paper_key']}" if row["audio_path"] else None
+            "audio_by_paper": {row["paper_key"]: f"/api/audio/{row['paper_key']}" if _audio_available(row["audio_path"]) else None
                                for row in conn.execute(f"SELECT paper_key, audio_path FROM papers WHERE paper_key IN ({paper_ph})", paper_keys)},
-            "audio_url": f"/api/audio/{p['paper_key']}" if p["audio_path"] else None,
+            "audio_url": f"/api/audio/{p['paper_key']}" if _audio_available(p["audio_path"]) else None,
+            "audio_edition": AUDIO_EDITION,
+            "papers_by_key": {key: _paper_brief(row) for key, row in papers.items()},
         }
+        kaoyan_papers = [row for row in papers.values() if row["exam_type"] == "kaoyan"]
+        if kaoyan_papers:
+            result["pdfs_by_paper"] = _kaoyan_pdfs(conn, kaoyan_papers)
+        return result
     finally:
         conn.close()
 
@@ -508,6 +689,11 @@ def submit_session(sid: int):
         qrows = {r["uid"]: r for r in conn.execute(
             f"SELECT * FROM questions WHERE uid IN ({ph})", uids
         ).fetchall()}
+        paper = conn.execute("SELECT exam_type, year FROM papers WHERE id=?", (sess["paper_id"],)).fetchone()
+        is_kaoyan = paper is not None and paper["exam_type"] == "kaoyan"
+        if is_kaoyan:
+            # Statistics follow the exam order, so per_section reads 完形 → 阅读 → 新题型.
+            uids = [q["uid"] for q in kaoyan.kaoyan_order([qrows[uid] for uid in uids if uid in qrows], uids)]
         answers = json.loads(sess["answers_json"] or "{}")
         revealed = set(json.loads(sess["revealed_uids"] or "[]"))
         detail = {}
@@ -547,15 +733,20 @@ def submit_session(sid: int):
         no_key = sum(1 for d in detail.values()
                      if d.get("kind") == "objective" and d["verdict"] == "no_key")
         graded = correct + wrong
+        labels = kaoyan.SECTION_CN if is_kaoyan else SECTION_CN
         result = {
             "submitted_at": datetime.now().isoformat(timespec="seconds"),
             "correct": correct, "wrong": wrong, "unanswered": unanswered,
             "no_key": no_key,
             "accuracy": round(correct / graded, 4) if graded else None,
-            "per_section": {SECTION_CN.get(k, k): v for k, v in per_section.items()},
+            "per_section": {labels.get(k, k): v for k, v in per_section.items()},
             "detail": detail,
-            "note": "正确率为客观题正确数/已作答且有标准答案的题数，非四六级考试成绩。",
+            "note": kaoyan.RESULT_NOTE if is_kaoyan else "正确率为客观题正确数/已作答且有标准答案的题数，非四六级考试成绩。",
         }
+        if is_kaoyan and sess["mode"] == "full" and paper["year"] >= kaoyan.SCORE_FROM_YEAR:
+            # Extra key: _backup_result ignores it, and backups carry result_json verbatim.
+            result["score"] = kaoyan.score((qrows[uid]["section"], d["verdict"]) for uid, d in detail.items()
+                                           if d.get("kind") == "objective")
         conn.execute(
             "UPDATE sessions SET submitted_at=datetime('now','localtime'), result_json=? WHERE id=?",
             (json.dumps(result, ensure_ascii=False), sid),
@@ -598,7 +789,7 @@ def history(limit: int = Query(100, ge=1, le=1000)):
     try:
         rows = conn.execute(
             "SELECT s.id, s.mode, s.started_at, s.submitted_at, s.result_json, "
-            "p.paper_key, p.year, p.month, p.set_no "
+            "p.paper_key, p.year, p.month, p.set_no, p.exam_type "
             "FROM sessions s JOIN papers p ON p.id=s.paper_id "
             "WHERE s.submitted_at IS NOT NULL ORDER BY s.submitted_at DESC, s.id DESC LIMIT ?",
             (limit,),
@@ -606,10 +797,15 @@ def history(limit: int = Query(100, ge=1, le=1000)):
         out = []
         for r in rows:
             d = dict(r)
+            exam = d.pop("exam_type")
             res = json.loads(d.pop("result_json") or "{}")
             d["correct"] = res.get("correct")
             d["wrong"] = res.get("wrong")
             d["accuracy"] = res.get("accuracy")
+            if exam == "kaoyan":
+                d.update(exam_type=exam, **kaoyan.paper_fields(r))
+                if isinstance(res.get("score"), dict):
+                    d["score"] = {"earned": res["score"].get("earned"), "total": res["score"].get("total")}
             out.append(d)
         return {"history": out}
     finally:
@@ -618,24 +814,38 @@ def history(limit: int = Query(100, ge=1, le=1000)):
 
 # ================================================================ 解析（单题）
 @app.get("/api/questions/{uid}")
-def question_detail(uid: str):
+def question_detail(uid: str, session: int | None = None):
     conn = db.connect()
     try:
         r = conn.execute("SELECT * FROM questions WHERE uid=?", (uid,)).fetchone()
         if r is None:
             raise HTTPException(404, "题目不存在")
-        q = _question_public(r, with_answer=True)
-        mats = conn.execute(
-            "SELECT * FROM section_materials WHERE paper_id=? AND section=?",
-            (r["paper_id"], r["section"]),
-        ).fetchall()
-        q["materials"] = [
-            {"group_key": m["group_key"], "directions": m["directions"],
-             "content": json.loads(m["content_json"] or "{}") if m["content_json"] else {},
-             "translation": json.loads(m["translation_json"] or "{}") if m["translation_json"] else {},
-             "analysis_text": m["analysis_text"]}
-            for m in mats
-        ]
+        paper = conn.execute("SELECT exam_type FROM papers WHERE id=?", (r["paper_id"],)).fetchone()
+        exam = paper["exam_type"] if paper else kaoyan.exam_of_key(r["paper_key"])
+        if exam == "kaoyan":
+            # The UI records a reveal before opening this, so references and evidence are always included.
+            ky = _kaoyan_context(conn, [r], with_answer=True)
+            q = _question_public(r, True, exam, ky)
+            mats = _kaoyan_sections(conn, r["paper_id"], True, ky.layouts.get(r["paper_id"]), r["section"]).get(r["section"], {})
+            if session is not None:
+                # A practice page asks with its session: until that session is submitted, only this question's own references.
+                sess = conn.execute("SELECT submitted_at FROM sessions WHERE id=?", (session,)).fetchone()
+                if sess is None or not sess["submitted_at"]:
+                    mats = kaoyan.own_references(mats, r)
+            q["materials"] = list(mats.values())
+        else:
+            q = _question_public(r, with_answer=True, exam=exam)
+            mats = conn.execute(
+                "SELECT * FROM section_materials WHERE paper_id=? AND section=? ORDER BY section, group_key",
+                (r["paper_id"], r["section"]),
+            ).fetchall()
+            q["materials"] = [
+                {"group_key": m["group_key"], "directions": m["directions"],
+                 "content": json.loads(m["content_json"] or "{}") if m["content_json"] else {},
+                 "translation": json.loads(m["translation_json"] or "{}") if m["translation_json"] else {},
+                 "analysis_text": m["analysis_text"]}
+                for m in mats
+            ]
         note = conn.execute("SELECT text FROM notes WHERE uid=?", (uid,)).fetchone()
         fav = conn.execute("SELECT 1 FROM favorites WHERE uid=?", (uid,)).fetchone()
         q["note"] = note["text"] if note else ""
@@ -716,19 +926,42 @@ def manual_fix(uid: str, body: FixBody):
 
 
 # ================================================================ 复习
+def _review_papers(conn, rows) -> tuple[dict, dict]:
+    """Paper rows and kaoyan layouts behind wrong-book / favorite rows, read once per request."""
+    ids, ph = _ids(r["paper_id"] for r in rows)
+    papers = {p["id"]: p for p in conn.execute(
+        f"SELECT id, paper_key, exam_type, year, month, set_no FROM papers WHERE id IN ({ph})", ids)} if ids else {}
+    return papers, _kaoyan_layouts(conn, [pid for pid, p in papers.items() if p["exam_type"] == "kaoyan"])
+
+
+def _review_row(r, row: dict, papers: dict, layouts: dict) -> dict:
+    """Kaoyan rows gain paper and layout fields plus a readable preview; CET rows stay exactly as they were."""
+    paper = papers.get(r["paper_id"])
+    if paper is None or paper["exam_type"] != "kaoyan":
+        return row
+    layout = layouts.get(r["paper_id"])
+    variant = kaoyan.question_variant(r["section"], layout)
+    row.update(section_cn=kaoyan.section_label(r["section"], variant), options=kaoyan.clean_options(row["options"]),
+               exam_type="kaoyan", year=paper["year"], month=paper["month"], set_no=paper["set_no"], **kaoyan.paper_fields(paper),
+               group_key=r["group_key"], variant=variant, preview=kaoyan.preview(r["section"], r["q_no"], r["stem"], layout))
+    return row
+
+
 @app.get("/api/review/wrong")
 def wrong_book():
     conn = db.connect()
     try:
         rows = conn.execute(
             "SELECT w.uid, w.wrong_count, w.first_wrong_at, w.last_wrong_at, w.resolved, "
-            "q.section, q.q_no, q.stem, q.paper_key, q.options_json, q.answer, q.status, q.flags_json "
+            "q.section, q.q_no, q.stem, q.paper_key, q.options_json, q.answer, q.status, q.flags_json, q.paper_id, q.group_key "
             "FROM wrong_book w JOIN questions q ON q.uid=w.uid "
             "ORDER BY w.resolved ASC, w.last_wrong_at DESC",
         ).fetchall()
+        papers, layouts = _review_papers(conn, rows)
         out = []
         for r in rows:
-            out.append({
+            flags = json.loads(r["flags_json"] or "[]")
+            out.append(_review_row(r, {
                 "uid": r["uid"], "wrong_count": r["wrong_count"],
                 "last_wrong_at": r["last_wrong_at"], "resolved": bool(r["resolved"]),
                 "section": r["section"], "section_cn": SECTION_CN.get(r["section"], r["section"]),
@@ -736,8 +969,8 @@ def wrong_book():
                 "paper_key": r["paper_key"],
                 "options": json.loads(r["options_json"] or "[]"),
                 "has_answer": r["answer"] is not None,
-                "status": r["status"], "flags": json.loads(r["flags_json"] or "[]"),
-            })
+                "status": r["status"], "flags": flags if isinstance(flags, list) else [],
+            }, papers, layouts))
         return {"wrong": out}
     finally:
         conn.close()
@@ -748,26 +981,29 @@ def favorites_list():
     conn = db.connect()
     try:
         rows = conn.execute(
-            "SELECT f.uid, f.created_at, q.section, q.q_no, q.stem, q.paper_key, q.options_json "
+            "SELECT f.uid, f.created_at, q.section, q.q_no, q.stem, q.paper_key, q.options_json, q.paper_id, q.group_key "
             "FROM favorites f JOIN questions q ON q.uid=f.uid ORDER BY f.created_at DESC",
         ).fetchall()
-        return {"favorites": [{
+        papers, layouts = _review_papers(conn, rows)
+        return {"favorites": [_review_row(r, {
             "uid": r["uid"], "created_at": r["created_at"],
             "section": r["section"], "section_cn": SECTION_CN.get(r["section"], r["section"]),
             "q_no": r["q_no"], "stem": (r["stem"] or "")[:120], "paper_key": r["paper_key"],
             "options": json.loads(r["options_json"] or "[]"),
-        } for r in rows]}
+        }, papers, layouts) for r in rows]}
     finally:
         conn.close()
 
 
 # ================================================================ 导入报告
 @app.get("/api/report")
-def import_report(exam: Literal["cet4", "cet6"] | None = None):
-    report_path = PROJECT / "data" / "import-report.json"
-    if not report_path.exists():
-        raise HTTPException(404, "尚未生成导入报告")
-    data = json.loads(report_path.read_text(encoding="utf-8"))
+def import_report(exam: ExamType | None = None):
+    data = {}
+    if exam != "kaoyan":  # import-report.json is written by the CET importer and knows no kaoyan paper.
+        report_path = PROJECT / "data" / "import-report.json"
+        if not report_path.exists():
+            raise HTTPException(404, "尚未生成导入报告")
+        data = json.loads(report_path.read_text(encoding="utf-8"))
     conn = db.connect()
     try:
         issues = [dict(r) for r in conn.execute(
@@ -785,12 +1021,13 @@ def import_report(exam: Literal["cet4", "cet6"] | None = None):
         subj = conn.execute(
             "SELECT COUNT(*) n FROM questions WHERE qtype IN ('essay','translation')"
         ).fetchone()
+        # Count papers, not material rows: a kaoyan paper has separate Part A / Part B essays.
         essays = conn.execute(
-            "SELECT COUNT(*) c FROM section_materials WHERE section='writing' "
+            "SELECT COUNT(DISTINCT paper_id) c FROM section_materials WHERE section='writing' "
             "AND content_json LIKE '%model_essay%'"
         ).fetchone()
         trans = conn.execute(
-            "SELECT COUNT(*) c FROM section_materials WHERE section='translation' "
+            "SELECT COUNT(DISTINCT paper_id) c FROM section_materials WHERE section='translation' "
             "AND content_json LIKE '%reference_translation%'"
         ).fetchone()
         if exam:
@@ -800,22 +1037,91 @@ def import_report(exam: Literal["cet4", "cet6"] | None = None):
             stats = conn.execute("SELECT COUNT(DISTINCT q.paper_key) papers, COUNT(*) questions, SUM(q.answer IS NOT NULL) answers FROM questions q JOIN papers p ON q.paper_id=p.id WHERE p.exam_type=?", (exam,)).fetchone()
             obj = conn.execute("SELECT COUNT(*) n, SUM(q.answer IS NOT NULL) a FROM questions q JOIN papers p ON q.paper_id=p.id WHERE p.exam_type=? AND q.qtype IN ('mcq','blank','match')", (exam,)).fetchone()
             subj = conn.execute("SELECT COUNT(*) n FROM questions q JOIN papers p ON q.paper_id=p.id WHERE p.exam_type=? AND q.qtype IN ('essay','translation')", (exam,)).fetchone()
-            essays = conn.execute("SELECT COUNT(*) c FROM section_materials s JOIN papers p ON s.paper_id=p.id WHERE p.exam_type=? AND s.section='writing' AND s.content_json LIKE '%model_essay%'", (exam,)).fetchone()
-            trans = conn.execute("SELECT COUNT(*) c FROM section_materials s JOIN papers p ON s.paper_id=p.id WHERE p.exam_type=? AND s.section='translation' AND s.content_json LIKE '%reference_translation%'", (exam,)).fetchone()
+            essays = conn.execute("SELECT COUNT(DISTINCT s.paper_id) c FROM section_materials s JOIN papers p ON s.paper_id=p.id WHERE p.exam_type=? AND s.section='writing' AND s.content_json LIKE '%model_essay%'", (exam,)).fetchone()
+            trans = conn.execute("SELECT COUNT(DISTINCT s.paper_id) c FROM section_materials s JOIN papers p ON s.paper_id=p.id WHERE p.exam_type=? AND s.section='translation' AND s.content_json LIKE '%reference_translation%'", (exam,)).fetchone()
+        summary = {
+            "papers": stats["papers"], "questions": stats["questions"],
+            "objective": {"questions": obj["n"], "with_answers": obj["a"]},
+            "subjective": subj["n"],
+            "writing_with_model_essay": essays["c"],
+            "translation_with_reference": trans["c"],
+            "generated_at": data.get("generated_at"),
+        }
+        if exam == "kaoyan":
+            return _kaoyan_report(conn, summary, issues)
         return {
-            "summary": {
-                "papers": stats["papers"], "questions": stats["questions"],
-                "objective": {"questions": obj["n"], "with_answers": obj["a"]},
-                "subjective": subj["n"],
-                "writing_with_model_essay": essays["c"],
-                "translation_with_reference": trans["c"],
-                "generated_at": data.get("generated_at"),
-            },
+            "summary": summary,
             "papers": data.get("papers", []),
             "issues": issues,
         }
     finally:
         conn.close()
+
+
+def _kaoyan_report(conn, summary: dict, import_issues: list) -> dict:
+    """题库报告（考研）：逐套明细、答案核验分布与待核对清单都取自数据库。"""
+    papers = conn.execute("SELECT * FROM papers WHERE exam_type='kaoyan' ORDER BY year DESC, set_no").fetchall()
+    created = conn.execute("SELECT MAX(created_at) FROM papers WHERE exam_type='kaoyan'").fetchone()[0]
+    summary["generated_at"] = created.replace(" ", "T") if created else None
+    counts: dict[int, dict] = {}
+    for r in conn.execute(
+        "SELECT q.paper_id, q.section, COUNT(*) n, SUM(q.answer IS NOT NULL) a FROM questions q "
+        "JOIN papers p ON p.id=q.paper_id WHERE p.exam_type='kaoyan' GROUP BY q.paper_id, q.section"
+    ):
+        counts.setdefault(r["paper_id"], {})[r["section"]] = {"questions": r["n"], "answers": r["a"] or 0}
+    with_essay = {r[0] for r in conn.execute(
+        "SELECT DISTINCT paper_id FROM section_materials WHERE section='writing' AND content_json LIKE '%model_essay%'")}
+    with_reference = {r[0] for r in conn.execute(
+        "SELECT DISTINCT paper_id FROM section_materials WHERE section='translation' AND content_json LIKE '%reference_translation%'")}
+    joined = _has_table(conn, "answer_checks")
+    checks = conn.execute(
+        "SELECT q.uid, q.paper_id, q.paper_key, q.section, q.q_no, q.answer, q.manual_locked, "
+        + ("a.status, a.answer AS checked_answer, a.summary " if joined else "NULL AS status, NULL AS checked_answer, NULL AS summary ")
+        + "FROM questions q JOIN papers p ON p.id=q.paper_id "
+        + ("LEFT JOIN answer_checks a ON a.uid=q.uid " if joined else "")
+        + "WHERE p.exam_type='kaoyan' AND q.section IN ('cloze','reading1','matching') ORDER BY q.paper_key, q.q_no"
+    ).fetchall()
+    statuses: dict[int, list] = {}
+    # Ordered by paper, then coverage note, import issues and per-question checks (in q_no order).
+    issues = [(r["paper_key"], 1, i, r) for i, r in enumerate(import_issues)]
+    for r in checks:
+        status = "manual" if r["manual_locked"] else r["status"] or "source_only"
+        statuses.setdefault(r["paper_id"], []).append(status)
+        base = {"paper_key": r["paper_key"], "section": r["section"], "uid": r["uid"]}
+        if status in ("disputed_resolved", "disputed_unresolved"):
+            issues.append((r["paper_key"], 2, r["q_no"], {**base, "level": "info" if status == "disputed_resolved" else "warn",
+                                                          "message": r["summary"] or kaoyan.CHECK_SUMMARY[status]}))
+        if r["status"] and status != "manual" and r["checked_answer"] != r["answer"]:
+            issues.append((r["paper_key"], 2, r["q_no"], {**base, "level": "warn",
+                                                          "message": f"答案核验记录已过期：核对时为 {r['checked_answer'] or '空'}，题库现为 {r['answer'] or '空'}"}))
+    for p in papers:
+        note = kaoyan.coverage_note(p["year"])
+        if note:
+            issues.append((p["paper_key"], 0, 0, {"paper_key": p["paper_key"], "section": None, "uid": None, "level": "info", "message": note}))
+    rows = []
+    for p in papers:
+        sections = {}
+        for section in kaoyan.SECTION_ORDER:
+            if section in counts.get(p["id"], {}):
+                sections[section] = dict(counts[p["id"]][section])
+                if section == "writing":
+                    sections[section]["essay"] = p["id"] in with_essay
+                elif section == "translation":
+                    sections[section]["reference_translation"] = p["id"] in with_reference
+        rows.append({"paper_key": p["paper_key"], **kaoyan.paper_fields(p), "coverage_note": kaoyan.coverage_note(p["year"]),
+                     "sections": sections, "answer_check_counts": kaoyan.check_counts(statuses.get(p["id"], []))})
+    meta = conn.execute("SELECT value FROM meta WHERE key='kaoyan_answer_checks'").fetchone()
+    try:
+        sources = json.loads(meta["value"]) if meta else None
+    except ValueError:
+        sources = None
+    return {
+        "summary": summary,
+        "answer_checks": kaoyan.check_counts(s for values in statuses.values() for s in values),
+        "answer_sources": sources,
+        "papers": rows,
+        "issues": [item for *_, item in sorted(issues, key=lambda entry: entry[:3])],
+    }
 
 
 # ================================================================ 文章标记
@@ -854,12 +1160,12 @@ def get_marks(paper_key: str, section: str):
 
 
 @app.get("/api/marks/all")
-def all_marks(exam: Literal["cet4", "cet6"] | None = None):
+def all_marks(exam: ExamType | None = None):
     """复习空间：全部标记连同试卷信息，最新在前；试卷缺失的标记也保留。"""
     conn = db.connect()
     try:
-        # Orphan marks have no paper row, so the exam falls back to the paper_key prefix.
-        exam_sql = "COALESCE(p.exam_type, CASE WHEN t.paper_key LIKE 'cet4-%' THEN 'cet4' ELSE 'cet6' END)"
+        # Orphan marks have no paper row, so the exam falls back to the paper_key pattern.
+        exam_sql = f"COALESCE(p.exam_type, {EXAM_FALLBACK_SQL.format(key='t.paper_key')})"
         sql = (f"SELECT t.*, {exam_sql} AS exam_type, p.year, p.month, p.set_no, p.id IS NULL AS paper_missing "
                "FROM text_marks t LEFT JOIN papers p ON p.paper_key=t.paper_key")
         args: list[Any] = []
@@ -867,7 +1173,7 @@ def all_marks(exam: Literal["cet4", "cet6"] | None = None):
             sql += f" WHERE {exam_sql}=?"; args.append(exam)
         rows = conn.execute(sql + " ORDER BY t.created_at DESC, t.rowid DESC", args).fetchall()
         return {"marks": [{**dict(r), "paper_missing": bool(r["paper_missing"]),
-                           "section_cn": SECTION_CN.get(r["section"], r["section"])} for r in rows]}
+                           "section_cn": _section_cn(r["section"], r["exam_type"])} for r in rows]}
     finally:
         conn.close()
 
@@ -1313,6 +1619,8 @@ def audio_file(paper_key: str, request: Request):
         relp = p["audio_path"]
     finally:
         conn.close()
+    if AUDIO_EDITION == "NoAudio":
+        raise HTTPException(404, "当前为无听力音频版，题目、录音原文和解析仍可使用")
     if not relp:
         raise HTTPException(404, "该套次无听力音频")
     path = _safe_source_path(relp)
@@ -1327,7 +1635,7 @@ def audio_file(paper_key: str, request: Request):
 def pdf_file(path: str = Query(...)):
     p = _safe_source_path(path, PDF_ROOT)
     if p.suffix.lower() != ".pdf" or not p.is_file():
-        return HTMLResponse('<!doctype html><meta charset="utf-8"><title>可选原卷资源</title><main style="max-width:620px;margin:60px auto;padding:24px;font:18px/1.8 system-ui"><h1>尚未安装这份原 PDF</h1><p>正常刷题、答案解析、句子精讲和听力不受影响。</p><p>Windows：将 Optional-PDF 的 resources 合并到程序目录。macOS：在菜单栏「四六级 → 选择原 PDF 文件夹」选择解压后的文件夹。</p></main>', status_code=404)
+        return HTMLResponse('<meta charset="utf-8"><h1>尚未安装这份原 PDF</h1><p>刷题和解析不受影响。四六级原 PDF 可从项目 Releases 下载 Optional-PDF；考研 PDF 请使用练习页的在线下载入口。</p>', status_code=404)
     return FileResponse(p, media_type="application/pdf", filename=p.name)
 
 
@@ -1335,11 +1643,15 @@ def pdf_file(path: str = Query(...)):
 @app.on_event("startup")
 def startup():
     db.init_db()
+    if os.environ.get("CET6_SEED_DB"):
+        from .seed_upgrade import upgrade_from_seed
+        upgrade_from_seed(db.DB_PATH, Path(os.environ["CET6_SEED_DB"]), fresh=os.environ.get("CET6_FRESH_DATABASE") == "1")
 
 
 @app.get("/api/health")
 def local_health():
-    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.3.0"}
+    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.4.0", "audio_edition": AUDIO_EDITION}
+
 
 @app.post("/api/local/shutdown")
 def local_shutdown(request: Request):
@@ -1347,8 +1659,10 @@ def local_shutdown(request: Request):
     if not token or not hmac.compare_digest(request.headers.get("X-CET6-Instance", ""), token):
         raise HTTPException(403, "仅允许本机启动器停止此实例")
     server = getattr(app.state, "local_server", None)
-    if server is None: raise HTTPException(503, "未由便携启动器启动")
+    if server is None:
+        raise HTTPException(503, "未由便携启动器启动")
     return JSONResponse({"stopping": True}, background=BackgroundTask(setattr, server, "should_exit", True))
+
 
 if FRONTEND_DIST.exists():
     app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="static")

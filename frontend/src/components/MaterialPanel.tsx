@@ -3,12 +3,13 @@ import { SubjectivePrompt } from './PdfProse'
 import PdfProse from './PdfProse'
 import type { ReadingTranslationParagraph } from '../readingTranslation'
 import Icon from './Icon'
+import KaoyanMaterial, { type KaoyanMaterialProps } from './KaoyanMaterial'
 import readingParagraphs from '../readingParagraphs.json'
 
-/** 左侧材料面板：按题型渲染共享材料（文章/词库/段落/写作翻译题面）。 */
+/** 左侧材料面板：按题型渲染共享材料（文章/词库/段落/写作翻译题面）。考研材料交给 KaoyanMaterial。 */
 export default function MaterialPanel({
   section, mat, selectedBlank, onBlankClick, paperKey,
-  wordAnswer, showTranscript, disabled = false, availableBlanks, showReadingTranslation = false, readingTranslation = [],
+  wordAnswer, showTranscript, disabled = false, availableBlanks, showReadingTranslation = false, readingTranslation = [], kaoyan,
 }: {
   section: string
   paperKey?: string
@@ -21,7 +22,10 @@ export default function MaterialPanel({
   availableBlanks?: number[]
   showReadingTranslation?: boolean
   readingTranslation?: ReadingTranslationParagraph[]
+  // Set only for kaoyan papers: the exam decides the renderer, never the material's shape.
+  kaoyan?: Omit<KaoyanMaterialProps, 'section' | 'mat' | 'disabled'>
 }) {
+  if (kaoyan) return <KaoyanMaterial section={section} mat={mat} disabled={disabled} {...kaoyan}/>
   if (!mat) return <div className="card material-card muted">该题型无共享材料。</div>
   const c = mat.content || {}
 

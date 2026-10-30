@@ -1,3 +1,5 @@
+import { textLines } from '../kaoyan'
+
 /** Reflow PDF line endings at display time. Source text and genuine blank paragraphs stay intact. */
 export function joinPdfLines(text: string): string {
   const lines = text.replace(/\r\n?/g, '\n').split('\n').map(line => line.trim()).filter(Boolean)
@@ -12,6 +14,12 @@ export function joinPdfLines(text: string): string {
 
 export default function PdfProse({ text, className = '' }: { text?: string; className?: string }) {
   return <div className={`pdf-prose ${className}`}>{(text || '').replace(/\r\n?/g, '\n').split(/\n\s*\n/).filter(block => block.trim()).map((block, i) => <p key={i}>{joinPdfLines(block)}</p>)}</div>
+}
+
+/** Kaoyan essays and reference translations: every non-empty line is its own paragraph. Unlike PdfProse it never
+ *  joins lines, so a letter keeps its salutation and sign-off and two paragraphs never run together (CONTRACT §6.4). */
+export function LineProse({ text, className = '' }: { text?: string | null; className?: string }) {
+  return <div className={`line-prose ${className}`}>{textLines(text).map((line, i) => <p key={i}>{line}</p>)}</div>
 }
 
 export function SubjectivePrompt({ text, section }: { text?: string; section: string }) {

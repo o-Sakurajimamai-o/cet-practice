@@ -114,7 +114,9 @@ export default function MarkableMaterial({ paper, section, children }: { paper: 
     const explicitTargets = Array.from(root.querySelectorAll<HTMLElement>('[data-mark-index]'))
     // Mouse drags may start on the edge of an option and include only surrounding whitespace.
     const matches = explicitTargets.filter(el => originalRange.intersectsNode(el))
-    const explicit = matches.find(el => el.contains(originalRange.startContainer) && el.contains(originalRange.endContainer))
+    // Kaoyan nests targets (a reading text 100+n holds its Chinese paragraphs), so the innermost one wins;
+    // document order puts it last. CET has no nested targets, so its choice is unchanged.
+    const explicit = [...matches].reverse().find(el => el.contains(originalRange.startContainer) && el.contains(originalRange.endContainer))
       || (matches.length === 1 ? matches[0] : undefined)
     const passageIndex = passages.findIndex(el => el.contains(originalRange.startContainer) && el.contains(originalRange.endContainer))
     const target = explicit || passages[passageIndex]

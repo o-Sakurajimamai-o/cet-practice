@@ -1,4 +1,4 @@
-/* 六级研习室 · design system. Offline first: system fonts and local vector icons only. */
+/* 英语研习室 · design system. Offline first: system fonts and local vector icons only. */
 
 /* ---------- Tokens ---------- */
 :root {
@@ -270,6 +270,10 @@ main { flex: 1; width: 100%; max-width: 1320px; margin: 0 auto; padding: 36px 44
 /* Each exam gets its own colour so the active one is obvious at a glance. */
 .hero.cet4 { --hero-from: #0b5d70; --hero-via: #12839a; --hero-to: #3478d4; --hero-glow: rgba(14, 108, 128, .75); --hero-ink: #0b5566; }
 html[data-theme='dark'] .hero.cet4 { --hero-from: #073846; --hero-via: #0b5262; --hero-to: #1c4b90; }
+/* 考研: a green family; the light end stays dark enough for white text on the hero card. */
+.hero.kaoyan { --hero-from: #1f5a47; --hero-via: #2a6f55; --hero-to: #387f5d; --hero-glow: rgba(31, 90, 71, .7); --hero-ink: #1d4b3c; }
+html[data-theme='dark'] .hero.kaoyan { --hero-from: #0e3328; --hero-via: #154736; --hero-to: #205942; }
+.hero.kaoyan .hero-cta:hover { background: #eef7f1; border-color: #eef7f1; }
 .hero-top { grid-area: top; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px 20px; }
 .hero-main { grid-area: main; }
 .hero-card { grid-area: card; }
@@ -355,6 +359,15 @@ html[data-theme='dark'] .hero.cet4 { --hero-from: #073846; --hero-via: #0b5262; 
 .restart-link:hover { background: transparent; color: var(--primary); }
 .library-footnote { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--muted); margin-top: 28px; }
 .library-footnote svg { color: var(--success); }
+/* 考研 board: 卷别 filter beside the heading, one card per year, 英一 / 英二 / 统考 badges, answer-check chip. */
+.section-heading.has-tracks { flex-wrap: wrap; }
+.track-filter .track-years { margin-left: 4px; font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.exam-card.kaoyan .exam-month { color: #1f6b50; background: #e2f2ea; }
+html[data-theme='dark'] .exam-card.kaoyan .exam-month { color: #7fd3ac; background: #12291f; }
+.set-no.track { align-items: center; padding-top: 0; font-family: var(--font-sans); font-size: 15px; font-weight: 700; letter-spacing: .04em; }
+.check-chip { padding: 0 7px; border-radius: 6px; font-size: 12px; color: var(--muted); background: var(--surface-3); font-variant-numeric: tabular-nums; }
+.check-chip.ok { color: var(--success); background: var(--success-soft); }
+.check-chip.warn { color: var(--warning); background: var(--warning-soft); }
 
 /* ---------- Practice ---------- */
 .practice-page { --practice-toolbar-height: 140px; --practice-rail-width: 264px; --question-nav-height: 0px; }
@@ -656,6 +669,40 @@ table.list tbody tr:hover td { background: var(--surface-2); }
 .issue-line { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--border); font-size: 14px; line-height: 1.75; }
 .issue-line > .tag { margin-top: 2px; }
 .issue-line p { margin: 2px 0 0; color: var(--text-2); }
+/* 考研 answer verification: one stacked bar (2px surface gaps) read through a labelled legend; colour never stands alone. */
+.evidence-card { padding: 22px 24px; }
+.evidence-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; }
+.evidence-head h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.evidence-head h3 svg { color: var(--primary); }
+.evidence-total { font-size: 14px; color: var(--muted); }
+.evidence-total b { font-family: var(--font-num); font-size: 22px; font-weight: 700; color: var(--text); margin-right: 2px; }
+.evidence-bar { display: flex; gap: 2px; height: 12px; margin: 16px 0 16px; border-radius: 99px; overflow: hidden; background: var(--surface); }
+.evidence-seg { flex: 1 1 0; min-width: 4px; background: var(--border-strong); }
+.evidence-seg.external_agree, .evidence-dot.external_agree { background: var(--success); }
+.evidence-seg.disputed_resolved, .evidence-dot.disputed_resolved { background: var(--primary); }
+.evidence-seg.disputed_unresolved, .evidence-dot.disputed_unresolved { background: var(--warning); }
+.evidence-seg.source_only, .evidence-dot.source_only { background: color-mix(in srgb, var(--faint) 60%, var(--surface-3)); }
+.evidence-seg.manual, .evidence-dot.manual { background: var(--violet); }
+.evidence-legend { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 24px; }
+.evidence-legend li { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.evidence-dot { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 3px; }
+.evidence-legend b { font-size: 14px; font-weight: 650; color: var(--text); }
+.evidence-count { margin-left: 8px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.evidence-legend p { margin: 2px 0 0; font-size: 13px; line-height: 1.65; color: var(--muted); }
+.evidence-note { display: flex; align-items: flex-start; gap: 8px; margin: 18px 0 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--border); font-size: 13px; line-height: 1.7; color: var(--text-2); }
+.evidence-note svg { margin-top: 3px; color: var(--warning); }
+.evidence-sources { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border); }
+.evidence-sources > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.evidence-sources > summary::-webkit-details-marker { display: none; }
+.evidence-sources > summary svg { color: var(--muted); transition: transform .15s; }
+.evidence-sources[open] > summary svg { transform: rotate(90deg); }
+.evidence-sources ul { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.evidence-sources li { display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.evidence-sources li b { font-weight: 600; color: var(--text); }
+.evidence-sources li p { margin: 0; color: var(--muted); }
+.paper-cell { min-width: 210px; }
+.paper-cell b { white-space: nowrap; }
+.paper-note { margin: 4px 0 0; max-width: 300px; font-size: 12px; line-height: 1.6; color: var(--warning); }
 
 /* ---------- Backup ---------- */
 .backup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -789,6 +836,14 @@ table.list tbody tr:hover td { background: var(--surface-2); }
   .confirm-dialog { margin-top: 4vh; padding: 22px; }
   .review-toolbar .grow { flex-basis: 100%; order: 3; }
 }
+@media (max-width: 560px) {
+  /* Three boards no longer fit side by side in a phone-width hero: the number sits above the name instead of clipping the third. */
+  .exam-switch { gap: 4px; }
+  .exam-switch button { flex-direction: column; gap: 6px; padding: 8px 4px; text-align: center; }
+  .exam-num { width: 34px; height: 34px; border-radius: 10px; font-size: 19px; }
+  .exam-label { align-items: center; }
+  .exam-label b { font-size: 15px; }
+}
 @media (max-width: 480px) {
   .qnav-legend { display: none; }
   .set-row { grid-template-columns: auto minmax(0, 1fr); }
@@ -797,6 +852,7 @@ table.list tbody tr:hover td { background: var(--surface-2); }
   .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .report-grid { grid-template-columns: minmax(0, 1fr); }
   .stat-tile { flex-direction: row; align-items: center; }
+  .track-filter .track-years { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -804,6 +860,11 @@ table.list tbody tr:hover td { background: var(--surface-2); }
 }
 
 .exam-switch-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}.exam-switch-row h2{margin:4px 0 0;font-size:22px}.exam-switch-row .eyebrow{font-size:11px;color:var(--text-muted,#737581);letter-spacing:.08em}@media(max-width:600px){.exam-switch-row{align-items:flex-start;flex-direction:column}.exam-switch-row .segmented{width:100%}.exam-switch-row .segmented button{flex:1}}
+/* Review / Report board switch (英语四级 · 英语六级 · 考研英语): the board name keeps its line beside the
+   full-width switch at 601–900px, and on the narrowest phones a label wraps instead of overflowing. */
+.exam-switch-row h2 { flex-shrink: 0; }
+@media (max-width: 480px) { .exam-switch-row .segmented button { white-space: normal; line-height: 1.25; } }
+@media (max-width: 360px) { .segmented button { padding-inline: 4px; } .segmented button span { margin-left: 3px; } }
 
 .sentence-insights{margin:18px 0;border:1px solid var(--border,#d7d9e1);border-radius:10px;padding:12px 14px}.sentence-insights>summary{cursor:pointer;font-weight:650}.sentence-insights-content{padding-top:8px}.sentence-insights-content section+section{border-top:1px solid var(--border,#d7d9e1);margin-top:20px;padding-top:14px}.sentence-insights-page{display:flex;justify-content:space-between;gap:12px;font-size:12px;margin-bottom:12px;color:var(--text-muted,#777)}
 /* Practice navigation and reading aids */

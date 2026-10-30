@@ -1,6 +1,6 @@
 # 四六级研习室 · macOS
 
-适用于 macOS 14 或更高版本。Apple 芯片（M 系列）下载 `macOS-arm64.zip`；Intel 芯片下载 `macOS-x86_64.zip`。无需安装 Python 或 Node.js。
+适用于 macOS 14 或更高版本。Apple 芯片（M 系列）选择 `macOS-arm64`；Intel 芯片选择 `macOS-x86_64`。`WithAudio` 附带听力，`NoAudio` 不含音频但保留听力题目和解析。无需安装 Python 或 Node.js。
 
 1. 完整解压，将 `CET-Practice.app` 拖到「应用程序」文件夹，然后双击打开。也可以保留整个解压文件夹并直接打开应用。
 2. 浏览器自动打开练习网页；菜单栏会出现「四六级」，可重新打开网页、查看数据目录、选择原 PDF 文件夹或退出。
@@ -10,6 +10,6 @@
 
 个人记录保存在 `~/Library/Application Support/CET-Practice/data`，日志和设置在其上级目录。升级时退出旧版，再替换应用，数据保留。Windows 记录可用网页的「备份与恢复」导入。
 
-PDF 为可选补充包，可沿用 v1.1.0 的 `Optional-PDF.zip`。解压后从菜单栏「四六级 → 选择原 PDF 文件夹」选择补充包或其中的 `resources`。音频和题库已内置，离线刷题无需 PDF。
+四六级原 PDF 为可选补充包，可沿用 v1.1.0 的 `Optional-PDF.zip`。解压后从菜单栏「四六级 → 选择原 PDF 文件夹」选择补充包或其中的 `resources`。考研整卷 PDF 可从练习页联网下载。
 
 感谢 [Linux Do 社区](https://linux.do/)。

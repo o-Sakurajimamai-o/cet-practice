@@ -11,13 +11,17 @@ import { parseReadingTranslation } from '../readingTranslation'
 import QuestionCard from '../components/QuestionCard'
 import Icon from '../components/Icon'
 import ThemeToggle from '../components/ThemeToggle'
+import { KaoyanGroupSwitch, KaoyanPdfLinks, KaoyanScore } from '../components/KaoyanPractice'
 import { SessionSaver, type SessionProgress } from '../sessionSaver'
+import {
+  EXAM_NAME, examOf, groupLabel, paperShort, paperTitle, resultSectionLabel, resultSectionRank, sectionLabel, sectionOrder, type Exam,
+} from '../exam'
+import { pickMaterial } from '../kaoyan'
 
-const SECTION_ORDER = ['listening', 'cloze', 'matching', 'reading1', 'reading2', 'writing', 'translation']
-const SECTION_CN: Record<string, string> = {
-  listening: '听力', cloze: '选词填空', matching: '长篇阅读',
-  reading1: '仔细阅读一', reading2: '仔细阅读二', writing: '写作', translation: '翻译',
-}
+// Kaoyan sections with several materials: the right column shows one group (Text n, Part A/B) at a time.
+const GROUPED_SECTIONS = ['reading1', 'writing']
+// Kaoyan sections whose paragraph translations can be shown under the English after submission.
+const KAOYAN_BILINGUAL = ['cloze', 'reading1', 'matching']
 
 export default function Practice() {
   const { sid } = useParams()
@@ -55,8 +59,10 @@ export default function Practice() {
   const clock = useRef<{ base: number; started: number } | null>(null)
   const audioPositions = useRef<Record<string, number>>({})
   const sectionPositions = useRef<Record<string, string>>({})
+  const groupPositions = useRef<Record<string, string>>({})
   const pendingReveals = useRef(new Set<Promise<any>>())
   const submitted = !!data?.session?.submitted_at
+  const exam: Exam = examOf(data?.paper)
   const translationPaper = data?.questions.find((q: any) => q.uid === currentUid)?.paper_key || data?.paper?.paper_key || ''
   const translationScope = `${translationPaper}:${activeSection}`
   const readingTranslationOpen = submitted && ['reading1', 'reading2'].includes(activeSection) && expandedTranslation === translationScope
@@ -92,7 +98,8 @@ export default function Practice() {
     getSession(Number(sid))
       .then((d) => {
         if (!active) return
-        const firstQ = d.questions.find((q: any) => SECTION_ORDER.includes(q.section))
+        const order = sectionOrder(examOf(d.paper))
+        const firstQ = d.questions.find((q: any) => order.includes(q.section))
         const restoredQ = d.questions.find((q: any) => q.uid === d.session.current_uid)
         const initialQ = restoredQ || firstQ
         const audioPaper = d.session.audio_paper_key || d.paper.paper_key
@@ -107,7 +114,7 @@ export default function Practice() {
         setData(d)
         loaded.current = true
         updateProgress({})
-        setActiveSection(initialQ?.section || 'listening')
+        setActiveSection(initialQ?.section || order[0])
         setSelectedBlank(initialQ?.qtype === 'blank' ? initialQ.q_no : null)
         if (restoredQ) requestAnimationFrame(() => {
           if (active) document.getElementById(`q-${restoredQ.uid}`)?.scrollIntoView({ block: 'start' })
@@ -213,6 +220,7 @@ export default function Practice() {
     if (!q || locked.current) return
     updateProgress({ current_uid: q.uid })
     sectionPositions.current[q.section] = q.uid
+    groupPositions.current[`${q.paper_key}:${q.section}:${q.group_key}`] = q.uid
     setActiveSection(q.section)
     setSelectedBlank(q.qtype === 'blank' ? q.q_no : null)
     if (scroll) requestAnimationFrame(() => document.getElementById(`q-${q.uid}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
@@ -239,7 +247,8 @@ export default function Practice() {
       pendingReveals.current.add(record)
       try { await record } finally { pendingReveals.current.delete(record) }
     }
-    const d = await questionDetail(uid)
+    // With the session, a kaoyan reveal before submission returns only this question's own references (CONTRACT §9.2).
+    const d = await questionDetail(uid, Number(sid))
     if (mounted.current) setAnalysisMap((m) => ({ ...m, [uid]: d }))
     return d
   }
@@ -317,7 +326,7 @@ export default function Practice() {
     const url = URL.createObjectURL(new Blob([JSON.stringify({ session_id: Number(sid), ...saver.progress }, null, 2)], { type: 'application/json' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = `cet6-local-answers-${sid}.json`
+    link.download = `${exam === 'kaoyan' ? 'kaoyan' : 'cet6'}-local-answers-${sid}.json`
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
@@ -325,7 +334,7 @@ export default function Practice() {
   // 分组必须在所有提前 return 之前（Hook 顺序稳定）
   const bySection = useMemo(() => {
     const m: Record<string, any[]> = {}
-    for (const s of SECTION_ORDER) m[s] = []
+    for (const s of sectionOrder(examOf(data?.paper))) m[s] = []
     for (const q of data?.questions || []) (m[q.section] = m[q.section] || []).push(q)
     return m
   }, [data])
@@ -411,6 +420,7 @@ export default function Practice() {
 
   const { questions, paper } = data
   const result = data.session.result
+  const kaoyan = exam === 'kaoyan'
   const secQuestions = bySection[activeSection] || []
   const focusedQuestion = secQuestions.find((q: any) => q.uid === currentUid) || secQuestions[0]
   const materialPaper = focusedQuestion?.paper_key || paper.paper_key
@@ -418,17 +428,34 @@ export default function Practice() {
   const visibleQuestions = secQuestions.filter((q: any) => !q.paper_key || q.paper_key === materialPaper)
   const sections = data.sections_by_paper?.[materialPaper] || data.sections || {}
   const audio_url = data.audio_by_paper ? data.audio_by_paper[materialPaper] : data.audio_url
-  const mat = sections[activeSection]?.main || Object.values(sections[activeSection] || {})[0]
-  const readingTranslation = submitted && ['reading1', 'reading2'].includes(activeSection)
+  // CET keeps main-or-first; kaoyan takes the focused question's own group (Text n, Part A/B).
+  const mat = pickMaterial(sections[activeSection], focusedQuestion?.group_key, exam)
+  const readingTranslation = !kaoyan && submitted && ['reading1', 'reading2'].includes(activeSection)
     ? parseReadingTranslation(mat?.translation?.passage_translation) : []
   const wordBank = mat?.content?.word_bank || []
-  const paragraphLabels = (mat?.content?.paragraphs || []).map((p: any) => p.label)
+  const paragraphLabels = kaoyan ? [] : (mat?.content?.paragraphs || []).map((p: any) => p.label)
   const wordAnswer: Record<number, string> = {}
-  for (const q of bySection.cloze || []) {
+  for (const q of kaoyan ? [] : bySection.cloze || []) {
     if (q.paper_key && q.paper_key !== materialPaper) continue
     const v = answers[q.uid]
     if (v) wordAnswer[q.q_no] = v
   }
+  const paperRow = (key: string) => data.papers_by_key?.[key] || (key === paper.paper_key ? paper : key)
+  // Kaoyan reading and writing show one group at a time; the group follows current_uid, so a reload restores it.
+  const groupKeys = kaoyan && GROUPED_SECTIONS.includes(activeSection) ? Object.keys(sections[activeSection] || {}) : []
+  const currentGroup = focusedQuestion?.group_key || ''
+  const groupTabs = groupKeys.length > 1 ? groupKeys.map(key => {
+    const inGroup = visibleQuestions.filter((q: any) => q.group_key === key)
+    return { key, label: groupLabel(activeSection, key, groupKeys.length), done: inGroup.filter((q: any) => answers[q.uid]).length, total: inGroup.length }
+  }) : []
+  const cardQuestions = groupTabs.length ? visibleQuestions.filter((q: any) => q.group_key === currentGroup) : visibleQuestions
+  const partBVariant = kaoyan ? sharedVariant(bySection.matching) : null
+  const kaoyanTranslation: string[] = kaoyan && submitted && KAOYAN_BILINGUAL.includes(activeSection) && Array.isArray(mat?.translation?.paragraphs)
+    ? mat.translation.paragraphs : []
+  const kaoyanBilingual = kaoyanTranslation.length > 0 && expandedTranslation === translationScope
+  const verdicts = kaoyan && submitted
+    ? Object.fromEntries(visibleQuestions.map((q: any) => [q.q_no, result?.detail?.[q.uid]?.verdict])) : undefined
+  const pdfs: { label: string; path: string }[] = kaoyan && Array.isArray(data.pdfs_by_paper?.[materialPaper]) ? data.pdfs_by_paper[materialPaper] : []
 
   const busyNow = submitting || restarting
   const questionButtons = visibleQuestions.map((q: any) => {
@@ -455,8 +482,9 @@ export default function Practice() {
   const objQs = questions.filter((q: any) => q.qtype !== 'essay' && q.qtype !== 'translation')
   const objAnswered = objQs.filter((q: any) => answers[q.uid]).length
   const fullMode = data.session.mode === 'full'
-  const availableSections = SECTION_ORDER.filter(s => bySection[s]?.length)
+  const availableSections = sectionOrder(exam).filter(s => bySection[s]?.length)
   const currentSectionIndex = availableSections.indexOf(activeSection)
+  const tabLabel = (s: string) => sectionLabel(s, exam, s === 'matching' ? partBVariant : null)
   function goSection(section: string) {
     focusQuestion(bySection[section].find(q => q.uid === sectionPositions.current[section]) || bySection[section][0])
     if (submitted) requestAnimationFrame(() => {
@@ -466,6 +494,25 @@ export default function Practice() {
     else window.scrollTo({ top: 0, behavior: 'instant' })
     pageRef.current?.querySelector('.material')?.scrollTo({ top: 0 })
   }
+  function selectGroup(key: string) {
+    const inGroup = visibleQuestions.filter((q: any) => q.group_key === key)
+    focusQuestion(inGroup.find((q: any) => q.uid === groupPositions.current[`${q.paper_key}:${q.section}:${key}`]) || inGroup[0])
+    // A newly chosen text starts at its top; the page only scrolls when the material is above the viewport.
+    requestAnimationFrame(() => {
+      pageRef.current?.querySelector('.material')?.scrollTo({ top: 0 })
+      const split = pageRef.current?.querySelector('.split')
+      const offset = (toolbarRef.current?.offsetHeight || 0) + (layout.rail ? 0 : navigationRef.current?.offsetHeight || 0) + 16
+      if (split && split.getBoundingClientRect().top < offset) window.scrollTo({ top: Math.max(0, window.scrollY + split.getBoundingClientRect().top - offset), behavior: 'instant' })
+    })
+  }
+  function focusNumber(no: number, keyboard: boolean) {
+    const q = secQuestions.find((x: any) => x.q_no === no && (!x.paper_key || x.paper_key === materialPaper))
+    focusQuestion(q, true)
+    // Keyboard users continue in the card they jumped to (a pointer tap must not open a phone keyboard);
+    // the smooth scroll above stays in charge of the viewport.
+    if (q && keyboard) requestAnimationFrame(() => document.getElementById(`q-${q.uid}`)
+      ?.querySelector<HTMLElement>('.opt[tabindex="0"], .letter-row button:not(:disabled), textarea:not(:disabled)')?.focus({ preventScroll: true }))
+  }
 
   return (
     <div className="practice-page" ref={pageRef} data-nav-layout={layout.rail ? 'rail' : 'top'} data-columns={layout.columns ? 'double' : 'single'}>
@@ -473,8 +520,8 @@ export default function Practice() {
         <div className="practice-head">
           <button className="icon-btn back-btn" aria-label="返回试卷库" title="返回试卷库" disabled={busyNow} onClick={async () => { try { refreshClock(); await persist(true); nav('/') } catch { /* Keep unsaved answers visible. */ } }}><Icon name="back" size={19}/></button>
           <div className="practice-title">
-            <b className="title">{fullMode ? `${paper.year} 年 ${paper.month} 月 · 第 ${paper.set_no} 套` : `${materialPaper} · 当前材料`}</b>
-            <span>{String(materialPaper).startsWith('cet4-') ? '英语四级' : '英语六级'} · {fullMode ? '整卷练习' : '错题重做'} · 客观题已答 {objAnswered}/{objQs.length}{savedTip && <em className="saved-tip"><Icon name="check" size={13}/>{savedTip}</em>}</span>
+            <b className="title">{fullMode ? paperTitle(paperRow(paper.paper_key)) : `${kaoyan ? paperTitle(paperRow(materialPaper)) : materialPaper} · 当前材料`}</b>
+            <span>{EXAM_NAME[examOf(paperRow(materialPaper))]} · {fullMode ? '整卷练习' : '错题重做'} · 客观题已答 {objAnswered}/{objQs.length}{savedTip && <em className="saved-tip"><Icon name="check" size={13}/>{savedTip}</em>}</span>
           </div>
           <span className="timer" title="已用时间"><Icon name="clock" size={16}/>{fmtElapsed(elapsed)}</span>
           <div className="practice-actions">
@@ -494,7 +541,7 @@ export default function Practice() {
         </div>
 
         <div className="section-tabs" role="tablist" aria-label="题型">
-          {SECTION_ORDER.filter((s) => bySection[s]?.length).map((s) => {
+          {availableSections.map((s) => {
             const done = bySection[s].filter((q: any) => answers[q.uid]).length
             const total = bySection[s].length
             return (
@@ -506,7 +553,7 @@ export default function Practice() {
                 disabled={busyNow}
                 onClick={() => goSection(s)}
               >
-                <span>{SECTION_CN[s]}</span><small>{done}/{total}</small>
+                <span>{tabLabel(s)}</span><small>{done}/{total}</small>
               </button>
             )
           })}
@@ -517,6 +564,7 @@ export default function Practice() {
             key={materialPaper}
             src={audio_url}
             hasAudio={!!audio_url}
+            noAudioEdition={data.audio_edition === 'NoAudio'}
             startPos={audioPositions.current[materialPaper] || 0}
             paused={busyNow}
             onPos={(p, updateUi = true) => {
@@ -545,7 +593,9 @@ export default function Practice() {
               <div><b>{objQs.length - objAnswered}</b><span>未作答</span></div>
               <div><b>{fmtElapsed(elapsed)}</b><span>用时</span></div>
             </div>
-            <p className="muted">未作答的客观题将计为未作答；缺少标准答案的题不判分；作文与翻译不参与统计（未填写草稿也可交卷）。</p>
+            <p className="muted">{kaoyan
+              ? '未作答的客观题将计为未作答；缺少参考答案的题不判分；翻译与写作不参与统计（未填写草稿也可交卷）。'
+              : '未作答的客观题将计为未作答；缺少标准答案的题不判分；作文与翻译不参与统计（未填写草稿也可交卷）。'}</p>
             <div className="confirm-actions">
               <button disabled={busyNow} onClick={() => setConfirming(false)} autoFocus>继续做题</button>
               <button className="primary" disabled={busyNow || saveConflict} onClick={doSubmit}>{submitting ? '保存并交卷中…' : '确认交卷'}</button>
@@ -566,15 +616,19 @@ export default function Practice() {
       <div className="section-side-switch" role="group" aria-label="切换题型">
           {[-1, 1].map(delta => {
             const target = availableSections[currentSectionIndex + delta]
-            const label = target ? `${delta < 0 ? '上一部分' : '下一部分'}：${SECTION_CN[target]}` : (delta < 0 ? '没有上一部分' : '没有下一部分')
+            const label = target ? `${delta < 0 ? '上一部分' : '下一部分'}：${tabLabel(target)}` : (delta < 0 ? '没有上一部分' : '没有下一部分')
             return <button key={delta} className={delta < 0 ? 'previous' : 'next'} disabled={!target || busyNow} aria-label={label} title={label} onClick={() => target && goSection(target)}><Icon name="chevron" size={26}/></button>
           })}
       </div>
       <div className="practice-content">
-      {submitted && result && <ResultHero result={result} />}
+      {submitted && result && <ResultHero result={result} exam={exam} paper={paperRow(paper.paper_key)} fullMode={fullMode}/>}
       <MarkableMaterial key={`${materialPaper}:${activeSection}`} paper={materialPaper} section={activeSection}>
       <div className="split">
         <div className="material">
+          {kaoyan && (groupTabs.length > 0 || pdfs.length > 0) && <div className="ky-material-bar">
+            {groupTabs.length > 0 && <KaoyanGroupSwitch section={activeSection} groups={groupTabs} current={currentGroup} disabled={busyNow} onSelect={selectGroup}/>}
+            <KaoyanPdfLinks pdfs={pdfs}/>
+          </div>}
           <MaterialPanel
             paperKey={materialPaper}
             section={activeSection}
@@ -590,26 +644,37 @@ export default function Practice() {
             showTranscript={submitted}
             showReadingTranslation={readingTranslationOpen}
             readingTranslation={readingTranslation}
+            kaoyan={kaoyan ? {
+              questions: visibleQuestions, answers, currentQNo: focusedQuestion?.q_no, onFocus: focusNumber,
+              bilingual: kaoyanBilingual, verdicts,
+            } : undefined}
           />
         </div>
         <div className="questions-col">
-          {submitted && ['reading1', 'reading2'].includes(activeSection) && <div className="reading-translation-control card">
+          {!kaoyan && submitted && ['reading1', 'reading2'].includes(activeSection) && <div className="reading-translation-control card">
             <div><b>阅读模式 · {readingTranslationOpen ? '中英对照' : '仅原文'}</b><span className="hint">{readingTranslation.length ? '每个英文自然段下方显示对应中文' : '本篇译文暂不可用，可对照原解析 PDF'}</span></div>
             <button disabled={!readingTranslation.length} aria-pressed={readingTranslationOpen} aria-controls="reading-passage"
               onClick={() => setExpandedTranslation(readingTranslationOpen ? null : translationScope)}>
               <Icon name="text" size={16}/>{readingTranslationOpen ? '切换为仅原文' : '切换为中英对照'}
             </button>
           </div>}
+          {kaoyanTranslation.length > 0 && <div className="reading-translation-control card">
+            <div><b>阅读模式 · {kaoyanBilingual ? '中英对照' : '仅原文'}</b><span className="hint">每个英文自然段下方显示对应中文；段落译文整理自懒笔记，非官方</span></div>
+            <button aria-pressed={kaoyanBilingual} aria-controls="kaoyan-passage"
+              onClick={() => setExpandedTranslation(kaoyanBilingual ? null : translationScope)}>
+              <Icon name="text" size={16}/>{kaoyanBilingual ? '切换为仅原文' : '切换为中英对照'}
+            </button>
+          </div>}
           {sectionPapers.length > 1 && <div className="redo-paper-switch">
             <label>当前试卷 <select aria-label="切换重做试卷" value={materialPaper} disabled={busyNow}
               onChange={e => focusQuestion(secQuestions.find((q: any) => q.paper_key === e.target.value))}>
-              {sectionPapers.map(key => <option key={key} value={key}>{key}（{secQuestions.filter((q: any) => q.paper_key === key).length} 题）</option>)}
+              {sectionPapers.map(key => <option key={key} value={key}>{kaoyan ? paperShort(paperRow(key)) : key}（{secQuestions.filter((q: any) => q.paper_key === key).length} 题）</option>)}
             </select></label>
             <span className="muted small">题目与左侧材料按试卷一起切换。</span>
           </div>}
-          {visibleQuestions.map((q: any, index: number) => {
+          {cardQuestions.map((q: any, index: number) => {
             const group = activeSection === 'listening' ? (mat?.content?.groups || []).find((g: any) => g.key === q.group_key || (q.q_no >= g.from && q.q_no <= g.to)) : null
-            const previous = visibleQuestions[index - 1]
+            const previous = cardQuestions[index - 1]
             const groupStart = group && (!previous || !(previous.q_no >= group.from && previous.q_no <= group.to))
             const ownSections = data.sections_by_paper?.[q.paper_key] || sections
             const ownMat = ownSections[q.section]?.main || Object.values(ownSections[q.section] || {})[0] as any
@@ -634,12 +699,13 @@ export default function Practice() {
                 onReveal={() => onReveal(q.uid)}
                 analysisData={analysisData}
                 paragraphLabels={q.qtype === 'match' ? (ownMat?.content?.paragraphs || []).map((p: any) => p.label) : paragraphLabels}
+                kaoyanMaterial={kaoyan ? pickMaterial(ownSections[q.section], q.group_key, exam) : undefined}
               />
               </Fragment>
             )
           })}
 
-          {activeSection === 'cloze' && wordBank.length === 0 && (
+          {!kaoyan && activeSection === 'cloze' && wordBank.length === 0 && (
             <div className="card muted">本套选词填空词库缺失（待核对）。</div>
           )}
         </div>
@@ -650,10 +716,21 @@ export default function Practice() {
   )
 }
 
-function ResultHero({ result }: { result: any }) {
+/** One Part B layout shared by every matching question of the session, for the tab label (新题型 · 排序). */
+function sharedVariant(questions: any[] = []): string | null {
+  const variants = new Set(questions.map(q => q.variant).filter(Boolean))
+  return variants.size === 1 ? [...variants][0] : null
+}
+
+function ResultHero({ result, exam, paper, fullMode }: { result: any; exam: Exam; paper: any; fullMode: boolean }) {
+  const kaoyan = exam === 'kaoyan'
   const graded = (result.correct || 0) + (result.wrong || 0)
   const pct = result.accuracy != null ? result.accuracy * 100 : null
   const R = 52, C = 2 * Math.PI * R
+  // Kaoyan results may carry the old CET labels; both read in exam order. CET keeps the stored order.
+  const perSection = Object.entries(result.per_section || {})
+  if (kaoyan) perSection.sort(([a], [b]) => resultSectionRank(a, exam) - resultSectionRank(b, exam))
+  const year = Number(typeof paper === 'object' ? paper?.year : 0)
   return (
     <section className="card result-hero" aria-label="交卷结果">
       <div className="result-ring">
@@ -665,22 +742,27 @@ function ResultHero({ result }: { result: any }) {
       </div>
       <div className="result-body">
         <h2>练习完成</h2>
-        <p className="muted">客观题正确率 = 正确 {result.correct} / 已作答且有答案 {graded}（不是四六级考试分数）</p>
+        {kaoyan
+          ? <p className="muted">客观题正确率 = 正确 {result.correct} / 已作答且有参考答案 {graded}（参考答案非官方）</p>
+          : <p className="muted">客观题正确率 = 正确 {result.correct} / 已作答且有答案 {graded}（不是四六级考试分数）</p>}
         <div className="result-stats">
           <div className="rs correct"><b>{result.correct}</b><span>正确</span></div>
           <div className="rs wrong"><b>{result.wrong}</b><span>错误</span></div>
           <div className="rs"><b>{result.unanswered}</b><span>未作答</span></div>
           <div className="rs"><b>{result.no_key}</b><span>无答案不判分</span></div>
         </div>
+        {kaoyan && result.score && typeof result.score === 'object' && <KaoyanScore score={result.score}/>}
+        {kaoyan && !result.score && (!fullMode || (year > 0 && year < 2005)) && <p className="muted small">
+          {fullMode ? '1998–2004 年试卷结构与现行考试不同，只显示正确率，不计参考分。' : '错题重做只统计正确率，不计参考分。'}</p>}
         {result.note && <p className="muted small">{result.note}</p>}
       </div>
       <div className="result-sections">
-        {Object.entries(result.per_section || {}).map(([k, v]: any) => {
+        {perSection.map(([k, v]: any) => {
           const total = (v.correct || 0) + (v.wrong || 0) + (v.unanswered || 0) + (v.no_key || 0)
           const w = (n: number) => `${total ? (n / total) * 100 : 0}%`
           return (
             <div key={k} className="rsec">
-              <div className="rsec-head"><span>{SECTION_CN[k] || k}</span><span>对 {v.correct} · 错 {v.wrong} · 未答 {v.unanswered}{v.no_key ? ` · 无答案 ${v.no_key}` : ''}</span></div>
+              <div className="rsec-head"><span>{resultSectionLabel(k, exam)}</span><span>对 {v.correct} · 错 {v.wrong} · 未答 {v.unanswered}{v.no_key ? ` · 无答案 ${v.no_key}` : ''}</span></div>
               <div className="rsec-bar"><i className="c" style={{ width: w(v.correct || 0) }}/><i className="w" style={{ width: w(v.wrong || 0) }}/></div>
             </div>
           )

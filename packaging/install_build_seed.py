@@ -1,30 +1,19 @@
-"""Install only the audited public seed created for v1.2.0."""
+"""Install and independently audit the exact sanitized v1.4.0 build seed."""
 import hashlib
-import zipfile
 from pathlib import Path
+from zipfile import ZipFile
+from audit_release_seed import audit
 from fetch_release_data import verify_seed
 
-PROJECT = Path(__file__).resolve().parents[1]
-archive = PROJECT / 'build-input/CET-Practice-v1.3.0-clean-build-seed.zip'
-released = PROJECT / 'build-input/CET-Practice-v1.2.0-Windows-x64.zip'
-if archive.exists():
-    with archive.open('rb') as f:
-        assert hashlib.file_digest(f, 'sha256').hexdigest() == '84920b9447ffedc05a861013067b9ce4a64f93af3644d962a45003b9d7b9f998'
-    prefix = 'seed/'
-    source = archive
-else:
-    prefix = 'CET-Practice/_internal/seed/'
-    source = released
-expected = {'cet6.db': '362a45cdd8111473a114d8ac4cd4a8f55af5a4b5f5b01216b0b385b7dc1b422e',
-            'import-report.json': '1bde73fca86c6478c908a915b66ac7964a16d0df6b1423ccc161f146242beb93'}
-with zipfile.ZipFile(source) as z:
-    if source == archive:
-        assert set(z.namelist()) == {prefix + name for name in expected}
-    for name, digest in expected.items():
-        content = z.read(prefix + name)
-        assert hashlib.sha256(content).hexdigest() == digest, name
-        path = PROJECT / 'seed' / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(content)
-verify_seed(PROJECT / 'seed/cet6.db')
-print('Validated current clean question bank, including empty personal text marks.')
+root = Path(__file__).resolve().parents[1]
+archive = root / 'build-input/CET-Practice-v1.4.0-clean-build-seed.zip'
+with archive.open('rb') as stream:
+    assert hashlib.file_digest(stream, 'sha256').hexdigest() == '057353d6c5a217732dadef5968ce70faff5e8b55af28db4bbf5dba431203e277'
+with ZipFile(archive) as z:
+    assert set(z.namelist()) == {'seed/cet6.db', 'seed/import-report.json'}
+    for name in z.namelist():
+        path = root / name
+        path.parent.mkdir(exist_ok=True)
+        path.write_bytes(z.read(name))
+audit(root / 'seed/cet6.db')
+verify_seed(root / 'seed/cet6.db')

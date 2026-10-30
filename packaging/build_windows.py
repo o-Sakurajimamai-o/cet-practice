@@ -1,5 +1,6 @@
 """Build on Windows using a clean venv; seed/resources must be supplied separately."""
 import importlib.metadata
+import argparse
 import json
 from pathlib import Path
 import shutil
@@ -7,7 +8,8 @@ import subprocess
 import sys
 
 PROJECT=Path(__file__).resolve().parents[1]
-def build():
+def build(edition):
+    (PROJECT/'seed/release.json').write_text(json.dumps({'audio_edition':edition}),encoding='utf-8')
     if not (PROJECT/'frontend/dist/index.html').is_file():
         subprocess.run(['npm.cmd','ci','--no-audit','--no-fund'],cwd=PROJECT/'frontend',check=True)
         subprocess.run(['npm.cmd','run','build'],cwd=PROJECT/'frontend',check=True)
@@ -27,9 +29,11 @@ def build():
     for name in ['Start.bat','Stop.bat','settings.json','README.md','THIRD_PARTY_NOTICES.md','LICENSE-NOTICE.md']:
         if (PROJECT/name).is_file(): shutil.copy2(PROJECT/name,target/name)
     shutil.copytree(PROJECT/'third_party_licenses',target/'third_party_licenses',dirs_exist_ok=True)
-    if (PROJECT/'resources').exists(): shutil.copytree(PROJECT/'resources',target/'resources',dirs_exist_ok=True)
+    if edition == 'WithAudio': shutil.copytree(PROJECT/'resources',target/'resources',dirs_exist_ok=True)
     (target/'data').mkdir(exist_ok=True)
     shutil.copy2(PROJECT/'data/README.txt',target/'data/README.txt')
     print('Portable output: '+str(target))
 
-if __name__=='__main__': build()
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(); parser.add_argument('--edition',choices=['WithAudio','NoAudio'],required=True)
+    build(parser.parse_args().edition)

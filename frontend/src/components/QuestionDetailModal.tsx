@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { questionDetail } from '../api'
+import { examOf, paperShort } from '../exam'
 import MaterialPanel from './MaterialPanel'
+import KaoyanReview from './KaoyanReview'
 import PdfProse from './PdfProse'
 import Icon from './Icon'
 import SentenceInsights from './SentenceInsights'
@@ -39,6 +41,7 @@ export default function QuestionDetailModal({ uid, onClose }: { uid: string; onC
   }, [uid, reload])
 
   const mat = q?.materials?.find((m: any) => m.group_key === q.group_key) || q?.materials?.[0]
+  const kaoyan = !!q && examOf(q) === 'kaoyan'
 
   return (
     <div
@@ -50,13 +53,14 @@ export default function QuestionDetailModal({ uid, onClose }: { uid: string; onC
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">
-          <div className="modal-title"><small>{q ? `${q.paper_key} · ${q.section_cn}` : '题目详情'}</small><b>{q ? `第 ${q.q_no} 题` : '加载中…'}</b></div>
-          {q?.status === 'needs_review' && <span className="tag warn" title={q.flags?.join('；')}>待核对</span>}
+          <div className="modal-title"><small>{q ? `${kaoyan ? paperShort(q) : q.paper_key} · ${q.section_cn}` : '题目详情'}</small><b>{q ? `第 ${q.q_no} 题` : '加载中…'}</b></div>
+          {q?.status === 'needs_review' && <span className="tag warn" title={Array.isArray(q.flags) ? q.flags.join('；') : undefined}>待核对</span>}
           <button className="icon-btn modal-close" onClick={onClose} aria-label="关闭" title="关闭（Esc）"><Icon name="close" size={18}/></button>
         </div>
         {err && <div className="notice error" role="alert">加载失败：{err}<button onClick={() => setReload(value => value + 1)}>重新加载</button></div>}
         {!q && !err && <div className="loading"><span className="spinner"/>加载题目…</div>}
-        {q && (
+        {q && kaoyan && <KaoyanReview q={q} mat={mat}/>}
+        {q && !kaoyan && (
           <>
             <div className="modal-columns">
               <div className="modal-material">

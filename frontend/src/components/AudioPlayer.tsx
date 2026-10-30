@@ -3,12 +3,13 @@ import Icon from './Icon'
 
 /** 听力播放器：播放/暂停/继续、拖动进度、音量、倍速；位置由外部恢复与保存。 */
 export default function AudioPlayer({
-  src, startPos, onPos, hasAudio, paused = false,
+  src, startPos, onPos, hasAudio, paused = false, noAudioEdition = false,
 }: {
   src: string | null
   startPos: number
   onPos: (pos: number, updateUi?: boolean) => void
   hasAudio: boolean
+  noAudioEdition?: boolean
   paused?: boolean
 }) {
   const ref = useRef<HTMLAudioElement | null>(null)
@@ -62,7 +63,7 @@ export default function AudioPlayer({
   if (!hasAudio || !src) {
     return (
       <div className="audio-bar no-audio-bar">
-        <span className="no-audio"><Icon name="alert" size={17}/>本套次缺少听力音频文件，无法播放（听力题仍可练习）</span>
+        <span className="no-audio"><Icon name="alert" size={17}/>{noAudioEdition ? '当前为无听力音频版，题目、录音原文和解析仍可使用。需要播放时请下载附听力版。' : '本套次缺少听力音频文件，无法播放（听力题仍可练习）'}</span>
       </div>
     )
   }
