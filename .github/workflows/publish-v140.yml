@@ -101,7 +101,7 @@ jobs:
           def get(path):return json.loads(subprocess.check_output(['gh','api',path]))
           def patch(data):subprocess.run(['gh','api','--method','PATCH',ep,'--input','-'],input=json.dumps(data),text=True,check=True,stdout=subprocess.DEVNULL)
           release=get(ep);assert release['draft'] and release['tag_name']=='v1.4.0'
-          patch({'target_commitish':os.environ['SOURCE_SHA']})
+          patch({'tag_name':'v1.4.0','target_commitish':os.environ['SOURCE_SHA']})
           paths=[*sorted(Path('release').glob('*.zip')),Path('release/SHA256SUMS.txt')]
           for path in paths:
             digest='sha256:'+hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
@@ -123,7 +123,7 @@ jobs:
             assert seed['digest']=='sha256:057353d6c5a217732dadef5968ce70faff5e8b55af28db4bbf5dba431203e277'
             subprocess.run(['gh','api','--method','DELETE',base+'/releases/assets/'+str(seed['id'])],check=True)
           assert {a['name'] for a in get(ep)['assets']}=={p.name for p in paths}
-          patch({'draft':False,'make_latest':'true','body':Path('release/release-notes.md').read_text(encoding='utf8')})
+          patch({'tag_name':'v1.4.0','draft':False,'make_latest':'true','body':Path('release/release-notes.md').read_text(encoding='utf8')})
           print('Published v1.4.0 after asset SHA-256 verification')
           PY
       - name: Keep publication evidence
