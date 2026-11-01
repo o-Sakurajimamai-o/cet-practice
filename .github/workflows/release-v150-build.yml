@@ -13,8 +13,8 @@ jobs:
         include:
           - {runner: windows-2025, platform: Windows-x64, arch: x64, edition: NoAudio}
           - {runner: windows-2025, platform: Windows-x64, arch: x64, edition: WithAudio}
-          - {runner: macos-14, platform: macOS-arm64, arch: arm64, edition: NoAudio}
-          - {runner: macos-14, platform: macOS-arm64, arch: arm64, edition: WithAudio}
+          - {runner: macos-15, platform: macOS-arm64, arch: arm64, edition: NoAudio}
+          - {runner: macos-15, platform: macOS-arm64, arch: arm64, edition: WithAudio}
           - {runner: macos-15-intel, platform: macOS-x86_64, arch: x86_64, edition: NoAudio}
           - {runner: macos-15-intel, platform: macOS-x86_64, arch: x86_64, edition: WithAudio}
     name: ${{ matrix.platform }}-${{ matrix.edition }}
