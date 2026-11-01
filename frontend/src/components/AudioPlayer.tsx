@@ -1,16 +1,20 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Icon from './Icon'
 
+export type ListeningCue = { number: number; from: number; to: number; start: number; estimated?: boolean }
+export type ListeningCueSet = { duration: number; cues: ListeningCue[] }
+
 /** 听力播放器：播放/暂停/继续、拖动进度、音量、倍速；位置由外部恢复与保存。 */
 export default function AudioPlayer({
-  src, startPos, onPos, hasAudio, paused = false, noAudioEdition = false,
+  src, startPos, onPos, hasAudio, paused = false, cueSet, noAudioEdition = false,
 }: {
   src: string | null
   startPos: number
   onPos: (pos: number, updateUi?: boolean) => void
   hasAudio: boolean
-  noAudioEdition?: boolean
   paused?: boolean
+  cueSet?: ListeningCueSet
+  noAudioEdition?: boolean
 }) {
   const ref = useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -85,6 +89,9 @@ export default function AudioPlayer({
     const m = Math.floor(s / 60), ss = Math.floor(s % 60)
     return `${m}:${String(ss).padStart(2, '0')}`
   }
+  const visibleCues = cueSet && dur > 0 && Math.abs(cueSet.duration - dur) < 1
+    ? cueSet.cues.filter(cue => Number.isFinite(cue.start) && cue.start >= 0 && cue.start < dur)
+    : []
 
   return (
     <div className="audio-bar">
@@ -115,20 +122,38 @@ export default function AudioPlayer({
       />
       <button className={`play${playing ? ' playing' : ''}`} disabled={paused} onClick={toggle} aria-label={playing ? '暂停' : '播放'}><Icon name={playing ? 'pause' : 'play'} size={18}/></button>
       <div className="audio-main">
-        <div className="audio-caption"><span><Icon name="headphones" size={15}/>听力音频</span><span className="audio-time">{fmt(cur)} <i>/</i> {fmt(dur)}</span></div>
-        <input
-          className="audio-progress"
-          aria-label="听力播放进度"
-          type="range" min={0} max={dur || 0} step={0.5} value={cur}
-          disabled={paused || !dur}
-          style={{ '--fill': `${dur ? (cur / dur) * 100 : 0}%` } as React.CSSProperties}
-          onChange={(e) => {
-            const v = Number(e.target.value)
-            setCur(v)
-            if (ref.current) ref.current.currentTime = v
-            onPos(v)
-          }}
-        />
+        <div className="audio-caption"><span><Icon name="headphones" size={15}/>听力音频{visibleCues.length > 0 && <small className="audio-cue-hint">点击水滴跳转篇目</small>}</span><span className="audio-time">{fmt(cur)} <i>/</i> {fmt(dur)}</span></div>
+        <div className={`audio-progress-track${visibleCues.length ? ' has-cues' : ''}`}>
+          <input
+            className="audio-progress"
+            aria-label="听力播放进度"
+            type="range" min={0} max={dur || 0} step={0.5} value={cur}
+            disabled={paused || !dur}
+            style={{ '--fill': `${dur ? (cur / dur) * 100 : 0}%` } as React.CSSProperties}
+            onChange={(e) => {
+              const v = Number(e.target.value)
+              setCur(v)
+              if (ref.current) ref.current.currentTime = v
+              onPos(v)
+            }}
+          />
+          {visibleCues.map((cue, index) => {
+            const label = `篇目 ${cue.number} · 第 ${cue.from}–${cue.to} 题 · ${cue.estimated ? '约 ' : ''}${fmt(cue.start)}${cue.estimated ? '（语音识别估计，可能有少量偏差）' : ''}`
+            // Keep neighboring hit areas disjoint even when markers are close together on a phone.
+            const gap = Math.min(cue.start - (visibleCues[index - 1]?.start ?? cue.start - dur),
+              (visibleCues[index + 1]?.start ?? cue.start + dur) - cue.start)
+            return <button key={`${cue.from}-${cue.to}`} type="button" className="audio-cue"
+              style={{ left: `calc(${100 * cue.start / dur}% + ${8 - 16 * cue.start / dur}px)`,
+                width: `min(30px, calc(${100 * gap / dur}% - ${16 * gap / dur}px))` }}
+              title={label} aria-label={`跳转到${label}`} disabled={paused}
+              onClick={() => {
+                if (!ref.current) return
+                ref.current.currentTime = cue.start
+                setCur(cue.start)
+                onPos(cue.start)
+              }}><svg viewBox="0 0 18 20" aria-hidden="true" focusable="false"><path d="M9 1.5C7.7 4.6 3 7.6 3 12a6 6 0 0 0 12 0c0-4.4-4.7-7.4-6-10.5Z"/></svg></button>
+          })}
+        </div>
       </div>
       <label className="audio-volume" title="音量"><Icon name="volume" size={17}/><span className="visually-hidden">音量</span><input type="range" min={0} max={1} step={0.05} value={vol}
         style={{ '--fill': `${vol * 100}%` } as React.CSSProperties}

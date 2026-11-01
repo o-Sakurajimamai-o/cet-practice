@@ -1,0 +1,2312 @@
+{
+  "2015-06-1": {
+    "duration": 1537.857619,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 41.8
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 231.53
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 448.57
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 621.87
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 19,
+        "start": 826.07
+      },
+      {
+        "number": 6,
+        "from": 20,
+        "to": 22,
+        "start": 1077.47
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1315.56,
+        "estimated": true
+      }
+    ]
+  },
+  "2015-06-2": {
+    "duration": 1511.363628,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 41.47
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 216.6
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 12,
+        "start": 418.2
+      },
+      {
+        "number": 4,
+        "from": 13,
+        "to": 15,
+        "start": 623.33
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 803.59,
+        "estimated": true
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1054.17
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1289.5
+      }
+    ]
+  },
+  "2015-06-3": {
+    "duration": 1521.487551,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 42.3
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 230.0
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 12,
+        "start": 459.27
+      },
+      {
+        "number": 4,
+        "from": 13,
+        "to": 15,
+        "start": 648.8
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 19,
+        "start": 843.99,
+        "estimated": true
+      },
+      {
+        "number": 6,
+        "from": 20,
+        "to": 22,
+        "start": 1081.2
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1296.73
+      }
+    ]
+  },
+  "2015-12-1": {
+    "duration": 1635.079546,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 41.7
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 213.57
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 410.57
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 605.57
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 840.42,
+        "estimated": true
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1112.7
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1388.6
+      }
+    ]
+  },
+  "2015-12-2": {
+    "duration": 1674.08907,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 41.93
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 218.6
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 438.57
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 634.5
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 19,
+        "start": 871.0,
+        "estimated": true
+      },
+      {
+        "number": 6,
+        "from": 20,
+        "to": 22,
+        "start": 1193.53
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1422.1
+      }
+    ]
+  },
+  "2015-12-3": {
+    "duration": 1633.29161,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 42.57
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 227.3
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 12,
+        "start": 439.53
+      },
+      {
+        "number": 4,
+        "from": 13,
+        "to": 15,
+        "start": 647.97
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 860.52,
+        "estimated": true
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1167.07
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1417.47
+      }
+    ]
+  },
+  "2016-06-1": {
+    "duration": 1576.611701,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 42.87
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 249.2
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 484.9
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 664.7
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 879.93
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1123.53
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1349.9
+      }
+    ]
+  },
+  "2016-06-2": {
+    "duration": 1633.38449,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 43.6
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 266.47
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 502.9
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 672.93
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 902.4
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1149.43
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1393.83
+      }
+    ]
+  },
+  "2016-12-1": {
+    "duration": 1617.432381,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 44.8
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 254.23
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 12,
+        "start": 480.67
+      },
+      {
+        "number": 4,
+        "from": 13,
+        "to": 15,
+        "start": 666.23
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 876.7
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1124.07
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1371.03
+      }
+    ]
+  },
+  "2016-12-2": {
+    "duration": 1675.551927,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 42.93
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 241.03
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 12,
+        "start": 478.7
+      },
+      {
+        "number": 4,
+        "from": 13,
+        "to": 15,
+        "start": 682.7
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 919.8
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1158.93
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1424.7
+      }
+    ]
+  },
+  "2017-06-1": {
+    "duration": 1607.81932,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 42.8
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 271.47
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 12,
+        "start": 510.93
+      },
+      {
+        "number": 4,
+        "from": 13,
+        "to": 15,
+        "start": 702.57
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 910.87
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1136.6
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1373.93
+      }
+    ]
+  },
+  "2017-06-2": {
+    "duration": 1677.711383,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 42.73
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 256.7
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 12,
+        "start": 498.8
+      },
+      {
+        "number": 4,
+        "from": 13,
+        "to": 15,
+        "start": 710.33
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 926.27
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1153.13
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1412.93
+      }
+    ]
+  },
+  "2017-12-1": {
+    "duration": 1601.735692,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 40.5
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 234.93
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 450.53
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 615.87
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 845.8
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1075.2,
+        "estimated": true
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1352.8
+      }
+    ]
+  },
+  "2017-12-2": {
+    "duration": 1625.791565,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 43.37
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 239.33
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 471.53
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 639.9
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 876.67
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 22,
+        "start": 1103.93
+      },
+      {
+        "number": 7,
+        "from": 23,
+        "to": 25,
+        "start": 1374.53
+      }
+    ]
+  },
+  "2018-06-1": {
+    "duration": 1650.753016,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 42.9
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 253.77
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 486.7
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 661.9
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 878.87
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1111.2
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1369.97
+      }
+    ]
+  },
+  "2018-06-2": {
+    "duration": 1651.565714,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 42.07
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 241.7
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 470.7
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 651.07
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 865.33
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1136.0
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1380.2
+      }
+    ]
+  },
+  "2018-12-1": {
+    "duration": 1616.201723,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 40.8
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 240.13
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 452.07
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 635.73
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 859.33
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1086.4
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1322.57
+      }
+    ]
+  },
+  "2018-12-2": {
+    "duration": 1580.466213,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 37.53
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 218.9
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 447.73
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 618.2
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 836.3
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1079.47
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1336.17
+      }
+    ]
+  },
+  "2019-06-1": {
+    "duration": 1652.215873,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 41.37
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 235.37
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 481.67
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 669.27
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 903.17
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1138.4
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1372.73
+      }
+    ]
+  },
+  "2019-06-2": {
+    "duration": 1671.116916,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 41.2
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 248.73
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 472.67
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 650.37
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 877.47
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1162.9
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1418.13
+      }
+    ]
+  },
+  "2019-12-1": {
+    "duration": 1682.935873,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 40.07
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 254.73
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 490.07
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 666.1
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 902.87
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1147.27
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1401.47
+      }
+    ]
+  },
+  "2019-12-2": {
+    "duration": 1682.866213,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 39.67
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 247.93
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 477.53
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 669.17
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 899.47
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1149.7
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1386.97
+      }
+    ]
+  },
+  "2020-07-1": {
+    "duration": 1612.231111,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 38.07
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 234.0
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 472.4
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 655.2
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 881.07
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1126.33
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1366.5
+      }
+    ]
+  },
+  "2020-09-1": {
+    "duration": 1576.100862,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 36.43
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 237.9
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 462.1
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 636.03
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 855.23
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1092.73
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1315.53
+      }
+    ]
+  },
+  "2020-12-1": {
+    "duration": 1540.551111,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 40.37
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 228.53
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 457.13
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 625.47
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 825.27
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1064.87
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1288.73
+      }
+    ]
+  },
+  "2020-12-2": {
+    "duration": 1600.249615,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 41.27
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 242.07
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 479.67
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 650.17
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 876.93
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1123.77
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1349.5
+      }
+    ]
+  },
+  "2021-06-1": {
+    "duration": 1690.180499,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 45.2
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 242.57
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 478.57
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 673.2
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 903.5
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1158.47
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1410.33
+      }
+    ]
+  },
+  "2021-06-2": {
+    "duration": 1702.185215,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 44.57
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 258.53
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 505.77
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 688.3
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 924.73
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1187.0
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1422.77
+      }
+    ]
+  },
+  "2021-12-1": {
+    "duration": 1576.124082,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 36.67
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 225.47
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 456.2
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 627.6
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 843.3
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1089.3
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1322.9
+      }
+    ]
+  },
+  "2021-12-2": {
+    "duration": 1617.618163,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 36.27
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 249.0
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 482.87
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 659.73
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 880.6
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1100.27
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1331.3
+      }
+    ]
+  },
+  "2022-06-1": {
+    "duration": 1707.943787,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 43.27
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 266.2
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 515.33
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 713.53
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 953.53
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1198.73
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1450.93
+      }
+    ]
+  },
+  "2022-09-1": {
+    "duration": 1633.872109,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 42.07
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 244.7
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 478.87
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 667.53
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 899.37
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1141.97
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1375.3
+      }
+    ]
+  },
+  "2022-12-1": {
+    "duration": 1635.660045,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 36.2
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 231.4
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 463.97
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 650.17
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 881.9
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1148.0
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1367.3
+      }
+    ]
+  },
+  "2022-12-2": {
+    "duration": 1586.062222,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 36.47
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 244.5
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 462.6
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 637.17
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 868.77
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1102.73
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1342.87
+      }
+    ]
+  },
+  "2023-03-1": {
+    "duration": 1575.079184,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 36.37
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 223.8
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 458.07
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 632.4
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 844.4
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1092.57
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1342.0
+      }
+    ]
+  },
+  "2023-06-1": {
+    "duration": 1652.842812,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 37.13
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 236.1
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 474.93
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 655.47
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 913.93
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1150.97
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1394.87
+      }
+    ]
+  },
+  "2023-06-2": {
+    "duration": 1653.144671,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 37.37
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 234.3
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 457.0
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 634.47
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 874.2
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1139.93
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1386.27
+      }
+    ]
+  },
+  "2023-12-1": {
+    "duration": 1564.839184,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 40.77
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 229.33
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 457.2
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 632.47
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 855.13
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1094.7
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1318.2
+      }
+    ]
+  },
+  "2023-12-2": {
+    "duration": 1564.189025,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 39.7
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 232.53
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 442.5
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 620.57
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 841.2
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1068.47
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1300.4
+      }
+    ]
+  },
+  "2024-06-1": {
+    "duration": 1619.452517,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 35.9
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 224.27
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 458.87
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 654.93
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 882.33
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1118.2
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1359.6
+      }
+    ]
+  },
+  "2024-06-2": {
+    "duration": 1548.515556,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 36.4
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 227.13
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 459.5
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 630.53
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 839.3
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1066.6
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1294.13
+      }
+    ]
+  },
+  "2024-12-1": {
+    "duration": 1664.847551,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 37.5
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 250.57
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 476.87
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 642.97
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 883.3
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1144.77
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1367.8
+      }
+    ]
+  },
+  "2024-12-2": {
+    "duration": 1639.653878,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 37.3
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 232.5
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 459.57
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 658.17
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 898.13
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1134.7
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1381.53
+      }
+    ]
+  },
+  "2025-06-1": {
+    "duration": 1558.058957,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 41.5
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 226.13
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 452.43
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 631.03
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 848.7
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1093.0
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1311.47
+      }
+    ]
+  },
+  "2025-06-2": {
+    "duration": 1567.718458,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 41.0
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 238.73
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 465.33
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 654.4
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 874.8
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1087.07
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1320.0
+      }
+    ]
+  },
+  "2025-12-1": {
+    "duration": 1543.244626,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 37.9
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 237.47
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 452.16
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 614.04
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 836.62
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1056.2
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1298.4
+      }
+    ]
+  },
+  "2025-12-2": {
+    "duration": 1554.413424,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 38.48
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 233.39
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 460.92
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 642.94
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 861.37
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1090.57
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1326.94
+      }
+    ]
+  },
+  "2026-06-1": {
+    "duration": 1495.806259,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 38.07
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 218.93
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 437.27
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 612.33
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 825.13
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1067.47
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1283.1
+      }
+    ]
+  },
+  "2026-06-2": {
+    "duration": 1587.40898,
+    "cues": [
+      {
+        "number": 1,
+        "from": 1,
+        "to": 4,
+        "start": 39.44
+      },
+      {
+        "number": 2,
+        "from": 5,
+        "to": 8,
+        "start": 224.64
+      },
+      {
+        "number": 3,
+        "from": 9,
+        "to": 11,
+        "start": 452.12
+      },
+      {
+        "number": 4,
+        "from": 12,
+        "to": 15,
+        "start": 642.04
+      },
+      {
+        "number": 5,
+        "from": 16,
+        "to": 18,
+        "start": 865.1
+      },
+      {
+        "number": 6,
+        "from": 19,
+        "to": 21,
+        "start": 1091.3
+      },
+      {
+        "number": 7,
+        "from": 22,
+        "to": 25,
+        "start": 1339.7
+      }
+    ]
+  }
+}

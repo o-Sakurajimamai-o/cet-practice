@@ -7,7 +7,7 @@ from pathlib import Path
 from fetch_release_data import verify_seed
 
 PROJECT = Path(__file__).resolve().parents[1]
-VERSION = '1.4.0'
+VERSION = '1.5.0'
 parser=argparse.ArgumentParser(); parser.add_argument('--edition',choices=['WithAudio','NoAudio'],required=True)
 edition=parser.parse_args().edition
 package = PROJECT / 'dist/CET-Practice'

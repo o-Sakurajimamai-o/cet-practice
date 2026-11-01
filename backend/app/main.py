@@ -1650,7 +1650,7 @@ def startup():
 
 @app.get("/api/health")
 def local_health():
-    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.4.0", "audio_edition": AUDIO_EDITION}
+    return {"ok": True, "instance_id": getattr(app.state, "instance_id", "source"), "version": "1.5.0", "audio_edition": AUDIO_EDITION}
 
 
 @app.post("/api/local/shutdown")

@@ -414,9 +414,18 @@ html[data-theme='dark'] .audio-bar .play { color: #0d0f1a; }
 .audio-main { flex: 1 1 240px; min-width: 180px; display: flex; flex-direction: column; gap: 6px; }
 .audio-caption { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
 .audio-caption > span:first-child { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-2); }
+.audio-cue-hint { font-size: 11px; font-weight: 400; color: var(--muted); }
 .audio-time { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
 .audio-time i { font-style: normal; color: var(--faint); margin: 0 2px; }
 .audio-progress { width: 100%; }
+.audio-progress-track { position: relative; display: flex; align-items: center; min-width: 0; }
+.audio-progress-track.has-cues { padding-bottom: 30px; }
+.audio-cue { position: absolute; top: calc(100% - 24px); z-index: 2; transform: translateX(-50%); display: grid; place-items: center; width: 30px; height: 24px; min-height: 0; padding: 0; border: 0; border-radius: 7px; background: transparent; box-shadow: none; }
+.audio-cue svg { width: min(16px, 100%); height: 18px; overflow: visible; }
+.audio-cue path { fill: var(--surface); stroke: var(--primary); stroke-width: 1.8; stroke-linejoin: round; }
+.audio-cue:hover { background: var(--primary-soft); }
+.audio-cue:hover path, .audio-cue:focus-visible path { fill: var(--primary-soft); }
+.audio-cue:active:not(:disabled), .audio-cue:disabled, .audio-cue:disabled:hover { transform: translateX(-50%); }
 .audio-volume { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
 .audio-volume input { width: 84px; }
 .audio-rate select { min-height: 34px; padding: 4px 30px 4px 12px; border-radius: 99px; font-size: 13px; font-weight: 600; background-color: var(--surface-2); }
@@ -891,6 +900,11 @@ table.list tbody tr:hover td { background: var(--surface-2); }
 /* Selection is available in answer text as well as the source passage. */
 .mark-tools { position: static; }
 .mark-popup { position: fixed; z-index: 90; transform: translateX(-50%); white-space: nowrap; min-height: 34px; padding: 6px 10px; background: var(--primary); color: var(--on-primary); border-color: var(--primary); box-shadow: var(--shadow-sm); }
+.mark-popup:active:not(:disabled), .mark-popup:disabled, .mark-popup:disabled:hover { transform: translateX(-50%); }
+.mark-remove-popup { position: fixed; z-index: 90; transform: translateX(-50%); width: max-content; max-width: min(360px, calc(100vw - 24px)); max-height: min(240px, 70vh); overflow: auto; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.mark-remove-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+.mark-remove-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mark-remove-row button { flex: none; min-height: 30px; padding: 4px 8px; font-size: 12px; }
 .opt .otext, .word-option [data-mark-index] { user-select: text; cursor: text; }
 .opt[aria-disabled='true'], .word-option[aria-disabled='true'] { cursor: default; }
 .opt[aria-disabled='true']:hover:not(.selected):not(.correct):not(.wrong) { border-color: var(--border); background: var(--surface); }

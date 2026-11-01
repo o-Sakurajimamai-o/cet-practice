@@ -4,7 +4,9 @@ import {
   getSession, saveState, markRevealed, submitSession,
   questionDetail, addFavorite, delFavorite, favoritesList, restartSession,
 } from '../api'
-import AudioPlayer from '../components/AudioPlayer'
+import AudioPlayer, { type ListeningCueSet } from '../components/AudioPlayer'
+import cet6ListeningCues from '../cet6ListeningCues.json'
+import cet4ListeningCues from '../cet4ListeningCues.json'
 import MaterialPanel from '../components/MaterialPanel'
 import MarkableMaterial from '../components/MarkableMaterial'
 import { parseReadingTranslation } from '../readingTranslation'
@@ -565,6 +567,8 @@ export default function Practice() {
             src={audio_url}
             hasAudio={!!audio_url}
             noAudioEdition={data.audio_edition === 'NoAudio'}
+            cueSet={exam === 'cet6' ? (cet6ListeningCues as Record<string, ListeningCueSet>)[materialPaper]
+              : exam === 'cet4' ? (cet4ListeningCues as Record<string, ListeningCueSet>)[materialPaper] : undefined}
             startPos={audioPositions.current[materialPaper] || 0}
             paused={busyNow}
             onPos={(p, updateUi = true) => {

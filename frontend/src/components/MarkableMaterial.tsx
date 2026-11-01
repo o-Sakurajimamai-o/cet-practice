@@ -30,24 +30,54 @@ function textOffset(root: HTMLElement, target: Node, offset: number): number | n
   return total
 }
 
+// Use the same ranges for painting and hit testing, including legacy offsets and nested translations.
+function rangesForMark(root: HTMLElement, mark: Mark): Range[] {
+  const passages = root.querySelectorAll<HTMLElement>('.passage')
+  const el = mark.passage_index < 10 ? passages[mark.passage_index]
+    : root.querySelector<HTMLElement>(`[data-mark-index="${mark.passage_index}"]`)
+  if (!el) return []
+  const nodes = textNodes(el), text = nodes.map(node => node.data).join('')
+  let start = mark.start_offset
+  if (text.slice(start, mark.end_offset) !== mark.text) {
+    const first = text.indexOf(mark.text)
+    if (first < 0 || text.indexOf(mark.text, first + 1) >= 0) return []
+    start = first
+  }
+  const ranges: Range[] = []
+  let offset = 0
+  for (const node of nodes) {
+    const from = Math.max(0, start - offset)
+    const to = Math.min(node.length, start + mark.text.length - offset)
+    if (to > from) {
+      const range = new Range(); range.setStart(node, from); range.setEnd(node, to); ranges.push(range)
+    }
+    offset += node.length
+    if (offset >= start + mark.text.length) break
+  }
+  return ranges
+}
+
 export default function MarkableMaterial({ paper, section, children }: { paper: string; section: string; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const [marks, setMarks] = useState<Mark[]>([])
   const [pending, setPending] = useState<Mark | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [popup, setPopup] = useState<{x: number; y: number} | null>(null)
+  const [markPopup, setMarkPopup] = useState<{ ids: string[]; x: number; y: number } | null>(null)
   const supported = typeof CSS !== 'undefined' && 'highlights' in CSS && 'Highlight' in window
   useEffect(() => {
-    const dismiss = () => { setPending(null); setPopup(null) }
+    const dismissSelection = () => { setPending(null); setPopup(null) }
+    const dismiss = () => { dismissSelection(); setMarkPopup(null) }
     const onSelectionChange = () => {
       const selection = window.getSelection()
       if (!selection || selection.isCollapsed || !selection.rangeCount
-        || !ref.current?.contains(selection.getRangeAt(0).commonAncestorContainer)) dismiss()
+        || !ref.current?.contains(selection.getRangeAt(0).commonAncestorContainer)) dismissSelection()
     }
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target
-      if (target instanceof Element && target.closest('[data-save-mark]')) return
+      if (target instanceof Element && target.closest('[data-save-mark], [data-mark-control]')) return
       dismiss()
     }
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') dismiss() }
@@ -62,7 +92,7 @@ export default function MarkableMaterial({ paper, section, children }: { paper: 
   }, [])
   useEffect(() => {
     let alive = true
-    setMarks([]); setPending(null); setPopup(null); setError('')
+    setMarks([]); setPending(null); setPopup(null); setMarkPopup(null); setError('')
     api(`/api/marks?paper_key=${encodeURIComponent(paper)}&section=${encodeURIComponent(section)}`)
       .then(d => { if (alive) setMarks(d.marks) })
       .catch(() => { if (alive) setError('标记加载失败，请刷新页面重试。') })
@@ -73,31 +103,7 @@ export default function MarkableMaterial({ paper, section, children }: { paper: 
     const root = ref.current
     const registry = (CSS as any).highlights
     const refresh = () => {
-      const ranges: Range[] = []
-      const passages = root.querySelectorAll<HTMLElement>('.passage')
-      for (const mark of marks) {
-        // Existing article marks use the original zero-based passage index.
-        const el = mark.passage_index < 10 ? passages[mark.passage_index]
-          : root.querySelector<HTMLElement>(`[data-mark-index="${mark.passage_index}"]`)
-        if (!el) continue
-        const text = textNodes(el).map(node => node.data).join('')
-        let start = mark.start_offset
-        if (text.slice(start, mark.end_offset) !== mark.text) {
-          const first = text.indexOf(mark.text)
-          if (first < 0 || text.indexOf(mark.text, first + 1) >= 0) continue
-          start = first
-        }
-        let offset = 0
-        for (const node of textNodes(el)) {
-          const from = Math.max(0, start - offset)
-          const to = Math.min(node.length, start + mark.text.length - offset)
-          if (to > from) {
-            const range = new Range(); range.setStart(node, from); range.setEnd(node, to); ranges.push(range)
-          }
-          offset += node.length
-          if (offset >= start + mark.text.length) break
-        }
-      }
+      const ranges = marks.flatMap(mark => rangesForMark(root, mark))
       registry.set('practice-marks', new (window as any).Highlight(...ranges))
     }
     refresh()
@@ -147,17 +153,47 @@ export default function MarkableMaterial({ paper, section, children }: { paper: 
     finally { setBusy(false) }
   }
   async function remove(id: string) {
-    setError('')
-    try { await api(`/api/marks/${encodeURIComponent(id)}`, { method: 'DELETE' }); setMarks(m => m.filter(x => x.id !== id)) }
+    if (deletingId) return
+    setDeletingId(id); setError('')
+    try {
+      await api(`/api/marks/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      setMarks(m => m.filter(x => x.id !== id))
+      setMarkPopup(current => {
+        if (!current) return null
+        const ids = current.ids.filter(value => value !== id)
+        return ids.length ? { ...current, ids } : null
+      })
+    }
     catch { setError('删除失败，请重试。') }
+    finally { setDeletingId(null) }
   }
-  return <div ref={ref} onMouseUp={capture}>
-    <div className="mark-tools"><span>选中正文、题目或解析中的单词或短句后标记</span><button data-save-mark disabled={!pending || busy} onMouseDown={e => e.preventDefault()} onClick={save}>标记选中内容</button>
-      {marks.length > 0 && <details><summary>已标记 {marks.length}</summary><ul>{marks.map(m => <li key={m.id}><span>{m.text}</span><button aria-label={`删除标记 ${m.text}`} onClick={() => remove(m.id)}>删除</button></li>)}</ul></details>}
+  function openMarkedText(event: React.MouseEvent<HTMLDivElement>) {
+    const root = ref.current, target = event.target
+    if (!supported || !root || event.button !== 0 || !window.getSelection()?.isCollapsed
+      || (target instanceof Element && target.closest('[data-mark-control], [data-save-mark], .mark-tools'))) return
+    const ids = marks.filter(mark => rangesForMark(root, mark).some(range =>
+      Array.from(range.getClientRects()).some(rect => event.clientX >= rect.left && event.clientX <= rect.right
+        && event.clientY >= rect.top && event.clientY <= rect.bottom))).map(mark => mark.id)
+    if (!ids.length) return
+    // An option may itself be a button: opening its mark must not change the answer.
+    event.preventDefault(); event.stopPropagation()
+    setPending(null); setPopup(null); setError('')
+    const halfWidth = Math.min(180, Math.max(0, window.innerWidth / 2 - 12))
+    setMarkPopup({ ids, x: Math.min(window.innerWidth - halfWidth - 12, Math.max(halfWidth + 12, event.clientX)), y: Math.max(12, Math.min(window.innerHeight - 120, event.clientY + 10)) })
+  }
+  return <div ref={ref} onMouseUp={capture} onClickCapture={openMarkedText}>
+    <div className="mark-tools"><span>选中文本后标记；点击高亮可取消标记</span><button data-save-mark disabled={!pending || busy} onMouseDown={e => e.preventDefault()} onClick={save}>标记选中内容</button>
+      {marks.length > 0 && <details><summary>已标记 {marks.length}</summary><ul>{marks.map(m => <li key={m.id}><span>{m.text}</span><button disabled={!!deletingId} aria-label={`删除标记 ${m.text}`} onClick={() => remove(m.id)}>取消标记</button></li>)}</ul></details>}
       {!supported && <span>当前浏览器不支持文章内高亮，已保存内容可在标记列表中查看。</span>}
       {error && <span role="alert">{error}</span>}
     </div>
     {pending && popup && <button className="mark-popup" data-save-mark style={{ left: popup.x, top: popup.y }} disabled={busy} onMouseDown={e => e.preventDefault()} onClick={save}>标记选中内容</button>}
+    {markPopup && <div className="mark-remove-popup" data-mark-control role="group" aria-label="取消标记" style={{ left: markPopup.x, top: markPopup.y }}>
+      {marks.filter(m => markPopup.ids.includes(m.id)).map(m => <div className="mark-remove-row" key={m.id}>
+        <span title={m.text}>{m.text}</span><button disabled={!!deletingId} aria-label={`取消标记 ${m.text}`} onClick={() => remove(m.id)}>{deletingId === m.id ? '取消中…' : '取消标记'}</button>
+      </div>)}
+      {error && <span role="alert">{error}</span>}
+    </div>}
     {children}
   </div>
 }

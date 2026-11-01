@@ -50,7 +50,7 @@ def get_asset_via_api(repo, token):
     for r in releases:
         tag = r.get('tag_name', '')
         rel_name = r.get('name', '')
-        if tag == 'v1.4.0':
+        if tag == 'v1.5.0':
             for asset in r.get('assets', []):
                 for name in ['CET-Practice-v1.4.0-clean-build-seed.zip']:
                     if asset['name'] == name:
@@ -79,7 +79,7 @@ def main():
             print(f'API download failed: {e}', flush=True)
 
     for name in ['CET-Practice-v1.4.0-clean-build-seed.zip']:
-        result = subprocess.run(['gh', 'release', 'download', 'v1.4.0', '--pattern', name, '--dir', str(target)],
+        result = subprocess.run(['gh', 'release', 'download', 'v1.5.0', '--pattern', name, '--dir', str(target)],
                                 capture_output=True, text=True)
         if result.returncode == 0 and (target / name).is_file():
             print(f'Retrieved a build seed via gh CLI: {name}')
