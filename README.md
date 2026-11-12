@@ -15,5 +15,10 @@ Windows / macOS 本地英语练习工具，支持四六级与考研英语。
 包含四级 46 套、六级 76 套及考研英语 46 套，支持记录进度、错题、收藏、笔记、划词统计和阅读中英切换。考研整卷 PDF 从练习页链接下载。四六级原 PDF 可选下载 [v1.1.0 的 Optional-PDF 补充包](https://github.com/o-Sakurajimamai-o/cet-practice/releases/tag/v1.1.0)。
 
 Windows 旧版请解压到新目录，再通过「备份与恢复」迁移记录。Mac 数据保存在 `~/Library/Application Support/CET-Practice/data`，替换应用前建议先备份。分享时请发送原始发布压缩包。
+源码运行与打包见 [构建说明](docs/BUILD.md)，第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-题库使用第三方参考答案，可能存在来源分歧；练习正确率不等于考试成绩。源码运行与打包见 [构建说明](docs/BUILD.md)，第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+## 说明
+六级覆盖到最新2026年6月，共 76 套；
+四级从2020年覆盖到最新2026年6月，共 46 套；
+考研划分为 英一/英二/早年统考，共 46 套；
+在这里祝福大家都可以取到理想的成绩，之后还会持续更新和优化，如果对你有帮助，欢迎点个 star⭐~
