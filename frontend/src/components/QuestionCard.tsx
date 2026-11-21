@@ -38,6 +38,8 @@ export default function QuestionCard({
     ? (analysisData?.materials || []).find((m: any) => (m.group_key || 'main') === (q.group_key || 'main')) || kaoyanMaterial
     : undefined
   const markBase = 1000 + (Number(q.q_no) || 0) * 100
+  // Placeholder numbers in this card's stem, in text order (one stem may cover a sentence with several blanks).
+  const stemBlankNumbers = [...String(q.stem || '').matchAll(/__\((\d+)\)__/g)].map(m => m[1])
   const choose = (key: string, keyboard = false) => {
     if (submitted || saving || (!keyboard && !window.getSelection()?.isCollapsed)) return
     onAnswer(key)
@@ -190,7 +192,14 @@ export default function QuestionCard({
           {q.stem && (
             <div className="stem muted">
               {q.stem.split(/__\(\d+\)__/).map((s: string, i: number, arr: any[]) => (
-                <span key={i}><span data-mark-index={markBase + 40 + i}>{s}</span>{i < arr.length - 1 ? <b className="blank-ref">{answer ? `${q.q_no} · ${answer}` : q.q_no}</b> : null}</span>
+                <span key={i}><span data-mark-index={markBase + 40 + i}>{s}</span>
+                  {i < arr.length - 1 && (() => {
+                    // A stem can hold several blanks: only this card's number shows its answer; other numbers stay gray.
+                    const no = stemBlankNumbers[i]
+                    const current = no === String(q.q_no)
+                    return <b className={`blank-ref${current ? '' : ' blank-ref-other'}`}>{current && answer ? `${no} · ${answer}` : no}</b>
+                  })()}
+                </span>
               ))}
             </div>
           )}
