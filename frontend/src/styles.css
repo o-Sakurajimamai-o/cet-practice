@@ -504,6 +504,7 @@ html[data-theme='dark'] .qnav .qn.correct, html[data-theme='dark'] .qnav .qn.wro
 .stem { margin: 4px 0 16px; font-family: var(--font-read); font-size: 1.04em; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
 .stem.muted { color: var(--text-2); }
 .blank-ref { display: inline-block; margin: 0 4px; padding: 0 9px; border-radius: 6px; background: var(--primary-soft); color: var(--primary-ink); font-family: var(--font-sans); font-size: .85em; }
+.blank-ref-other { background: var(--surface-3); color: var(--faint); }
 .opts { display: flex; flex-direction: column; gap: 9px; }
 .opt { display: flex; align-items: flex-start; gap: 14px; width: 100%; min-height: 0; padding: 12px 16px 12px 12px; text-align: left; white-space: normal; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font-family: var(--font-read); font-size: inherit; font-weight: 400; line-height: 1.6; }
 .opt:hover { border-color: var(--primary); background: var(--primary-soft); color: var(--text); }
